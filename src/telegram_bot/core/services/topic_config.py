@@ -44,6 +44,9 @@ _DEFAULT_ENGINE: Engine = "claude"
 _MODEL_OVERRIDE_RE = re.compile(r"^[A-Za-z0-9._:-]{1,80}$")
 _CORE_PROMPT_MODES: set[str] = {"task", "knowledge", "free", "project", "blog"}
 
+DYNAMIC_CWD_SENTINEL = "DYNAMIC"
+"""Sentinel cwd value; path resolved at engine-spawn time via an external HTTP resolver."""
+
 _valid_modes_cache: tuple[int, set[str]] = (-1, set())
 
 
@@ -82,6 +85,7 @@ class TopicSettings:
     exec_mode: ExecMode = _DEFAULT_EXEC_MODE
     engine: Engine = _DEFAULT_ENGINE
     model: str | None = None
+    dynamic_cwd: bool = False  # True when cwd was DYNAMIC_CWD_SENTINEL; resolved at spawn time
 
 
 def _default_topic() -> TopicSettings:
@@ -187,9 +191,22 @@ class TopicConfig:
                     mode = "free"
 
                 # Validate cwd
+                dynamic_cwd = False
                 if cwd is not None:
                     cwd = str(cwd)
-                    if not os.path.isabs(cwd):
+                    if cwd == DYNAMIC_CWD_SENTINEL:
+                        # DYNAMIC sentinel — actual path resolved at engine-spawn time
+                        # via an external HTTP resolver (see workspace_resolver.py).
+                        dynamic_cwd = True
+                        cwd = None
+                        if value.get("exec_mode") == "tmux":
+                            logger.warning(
+                                "cwd=DYNAMIC combined with exec_mode=tmux for topic %d; "
+                                "tmux mode reuses sessions across messages and is incompatible "
+                                "with per-message dynamic cwd (deferred enforcement — see T03)",
+                                thread_id,
+                            )
+                    elif not os.path.isabs(cwd):
                         logger.warning(
                             "Relative cwd path %r for topic %d, falling back to None",
                             cwd,
@@ -279,6 +296,7 @@ class TopicConfig:
                     exec_mode=exec_mode,
                     engine=engine,
                     model=model,
+                    dynamic_cwd=dynamic_cwd,
                 )
 
         # Parse routing
