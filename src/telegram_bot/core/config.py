@@ -7,6 +7,7 @@ their own settings on top of these generic core settings.
 
 import functools
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Voice message size cap enforced at every ingestion point (incoming
@@ -41,6 +42,17 @@ class Settings(BaseSettings):
     topic_config_path: str = "./topic_config.json"
     notification_chat_id: int | None = None
     tmux_sessions_dir: str = "./tmux_sessions"
+    workspace_resolver_url: str | None = Field(
+        None,
+        validation_alias=AliasChoices(
+            "workspace_resolver_url",
+            "TELEGRAM_AI_AGENT_CWD_RESOLVER_URL",
+        ),
+        description=(
+            "HTTP resolver URL for cwd:DYNAMIC topics. "
+            "Required when any topic uses cwd:DYNAMIC."
+        ),
+    )
 
 
 @functools.lru_cache(maxsize=1)
