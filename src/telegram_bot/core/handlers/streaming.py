@@ -8,6 +8,7 @@ import html
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from aiogram.enums import ChatType, ParseMode
@@ -557,6 +558,7 @@ async def send_streaming_response(
     git_sync: Any | None = None,
     tmux_manager: TmuxManager | None = None,
     topic_config: TopicConfig | None = None,
+    cwd_override: Path | None = None,
 ) -> None:
     """Send prompt to CC with streaming and deliver response to user.
 
@@ -734,6 +736,7 @@ async def send_streaming_response(
                 prompt,
                 on_event,
                 on_engine_changed=_notify_engine_changed,
+                cwd_override=cwd_override,
             )
     except asyncio.CancelledError:
         # Status messages ARE the history — no cleanup needed

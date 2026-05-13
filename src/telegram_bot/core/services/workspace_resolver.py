@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,16 @@ import httpx
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+# Mirrors LeaseRequest.task_id pattern; used defensively in release() to reject
+# values that bypass Pydantic validation (e.g., direct WorkspaceResolver.release()
+# calls from future callers that skip build_task_id).
+_TASK_ID_RE = re.compile(r"^[A-Z0-9\-]{3,40}$")
+
+# Maximum response body size accepted from the resolver.  LeaseResponse is
+# tiny (~100 bytes); a 64 KB cap defends against a buggy or malicious resolver
+# sending a large payload that would exhaust bot memory under load.
+_MAX_LEASE_RESPONSE_BYTES = 64 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -176,12 +187,23 @@ class WorkspaceResolver:
             )
 
             if response.status_code == 200:
+                if len(response.content) > _MAX_LEASE_RESPONSE_BYTES:
+                    raise WorkspaceBadRequestError(
+                        f"Resolver response too large "
+                        f"({len(response.content)} bytes > {_MAX_LEASE_RESPONSE_BYTES}) "
+                        f"for task_id={request.task_id}"
+                    )
                 lease_response = LeaseResponse.model_validate(response.json())
                 cwd = lease_response.cwd
-                logger.info(
+                # DEBUG: cwd paths may reveal internal directory structure.
+                logger.debug(
                     "workspace_resolver: lease success task_id=%s cwd=%s",
                     request.task_id,
                     cwd,
+                )
+                logger.info(
+                    "workspace_resolver: lease success task_id=%s",
+                    request.task_id,
                 )
                 return Path(cwd)
 
@@ -236,13 +258,21 @@ class WorkspaceResolver:
         Parameters
         ----------
         task_id:
-            Identifier of the workspace to release.
+            Identifier of the workspace to release.  Must match
+            ``^[A-Z0-9-]{3,40}$`` — validated defensively to prevent URL
+            path traversal from callers that bypass ``build_task_id``.
 
         Raises
         ------
+        WorkspaceBadRequestError
+            ``task_id`` fails the format check (caller bug, not a network error).
         WorkspaceUnreachableError
             All retry attempts exhausted (5xx or timeout).
         """
+        if not _TASK_ID_RE.fullmatch(task_id):
+            raise WorkspaceBadRequestError(
+                f"release() received an invalid task_id {task_id!r}; must match ^[A-Z0-9-]{{3,40}}$"
+            )
         url = f"{self._base_url}/worktree/{task_id}"
         last_exc: Exception | None = None
 

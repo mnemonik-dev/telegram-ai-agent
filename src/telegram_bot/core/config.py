@@ -6,8 +6,9 @@ their own settings on top of these generic core settings.
 """
 
 import functools
+from urllib.parse import urlsplit
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Voice message size cap enforced at every ingestion point (incoming
@@ -49,9 +50,36 @@ class Settings(BaseSettings):
             "TELEGRAM_AI_AGENT_CWD_RESOLVER_URL",
         ),
         description=(
-            "HTTP resolver URL for cwd:DYNAMIC topics. Required when any topic uses cwd:DYNAMIC."
+            "HTTP resolver URL for cwd:DYNAMIC topics. Required when any topic uses cwd:DYNAMIC. "
+            "Must use http:// or https:// scheme. "
+            "Operator-controlled: the resolver protocol has no built-in authentication; "
+            "either bind it to loopback (127.0.0.1) or terminate TLS + mTLS at a reverse "
+            "proxy before exposing it across a network."
         ),
     )
+
+    @field_validator("workspace_resolver_url", mode="before")
+    @classmethod
+    def _validate_resolver_url_scheme(cls, v: object) -> object:
+        """Reject non-http/https schemes to prevent SSRF via misconfigured env vars.
+
+        Accepts None (resolver disabled) and http/https URLs only.
+        Rejects file://, ftp://, unix://, and any other scheme with a clear
+        error message.
+        """
+        if v is None or v == "":
+            return v
+        if not isinstance(v, str):
+            return v
+        parsed = urlsplit(v)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(
+                f"workspace_resolver_url must use http:// or https:// scheme, "
+                f"got {parsed.scheme!r}. "
+                f"Set TELEGRAM_AI_AGENT_CWD_RESOLVER_URL to a valid http/https URL "
+                f"or leave it unset to disable dynamic cwd resolution."
+            )
+        return v
 
 
 @functools.lru_cache(maxsize=1)

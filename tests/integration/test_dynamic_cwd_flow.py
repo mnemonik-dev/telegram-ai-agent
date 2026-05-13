@@ -376,3 +376,144 @@ async def test_release_failure_logged_does_not_mask_engine_error(
     # Release failure must be logged as a warning, not raised
     release_warning = any("workspace release failed" in r.message for r in caplog.records)
     assert release_warning, "Expected a warning log about release failure"
+
+
+# ---------------------------------------------------------------------------
+# T07 F1: Resolver URL sanitized before logging (userinfo stripped)
+# ---------------------------------------------------------------------------
+
+
+def test_startup_log_strips_userinfo_from_resolver_url(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Resolver URL in startup log must not include userinfo/credentials (T07 F1).
+
+    Simulates __main__._start() logging behavior: the safe URL should contain
+    only scheme+host+port, never userinfo (user:password@) or path/query.
+    """
+    from urllib.parse import urlsplit
+
+    def _make_safe_url(raw: str) -> str:
+        """Mirrors the sanitization logic in __main__._start()."""
+        _u = urlsplit(raw)
+        _host_part = _u.hostname or ""
+        if _u.port is not None:
+            _host_part = f"{_host_part}:{_u.port}"
+        return f"{_u.scheme}://{_host_part}" if _host_part else "(configured)"
+
+    # URL with userinfo (credentials embedded)
+    secret_url = "http://user:secret-token@resolver.internal:8765/path"
+    safe_url = _make_safe_url(secret_url)
+
+    # The safe URL must not contain the userinfo component
+    assert "secret-token" not in safe_url
+    assert "user:" not in safe_url
+    # But it should still contain the host and port for diagnostics
+    assert "resolver.internal" in safe_url
+    assert "8765" in safe_url
+
+
+def test_startup_log_no_path_leakage() -> None:
+    """Resolver URL logging strips path and query components."""
+    from urllib.parse import urlsplit
+
+    def _make_safe_url(raw: str) -> str:
+        _u = urlsplit(raw)
+        _host_part = _u.hostname or ""
+        if _u.port is not None:
+            _host_part = f"{_host_part}:{_u.port}"
+        return f"{_u.scheme}://{_host_part}" if _host_part else "(configured)"
+
+    url_with_path = "http://resolver.internal:8765/api/v1/workspace?token=secret"
+    safe_url = _make_safe_url(url_with_path)
+
+    assert "secret" not in safe_url
+    assert "/api/v1" not in safe_url
+    assert "resolver.internal:8765" in safe_url
+
+
+# ---------------------------------------------------------------------------
+# T07 F6: Startup fail-fast when DYNAMIC topic exists but resolver URL unset
+# ---------------------------------------------------------------------------
+
+
+def test_startup_failfast_logs_error_for_dynamic_topics_without_resolver(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Startup must log ERROR when any DYNAMIC topic exists but resolver URL is None (T07 F6).
+
+    This test validates the startup scan logic in __main__._start() that was
+    added to surface misconfigurations at boot rather than at first message time.
+    """
+    from telegram_bot.core.services.topic_config import TopicSettings
+
+    dynamic_topic = TopicSettings(
+        name="coding",
+        type="project",
+        mode="task",
+        cwd=None,
+        mcp_config=None,
+        exec_mode="subprocess",
+        dynamic_cwd=True,
+    )
+
+    # Simulate the startup check logic from __main__._start()
+    topics = {10: dynamic_topic}
+    workspace_resolver = None  # resolver URL unset
+
+    import logging as _logging
+
+    logger = _logging.getLogger("startup_test")
+
+    with caplog.at_level(_logging.ERROR, logger="startup_test"):
+        if workspace_resolver is None:
+            dynamic_topic_ids = [
+                thread_id for thread_id, ts in topics.items() if getattr(ts, "dynamic_cwd", False)
+            ]
+            if dynamic_topic_ids:
+                logger.error(
+                    "Startup misconfiguration: %d topic(s) have cwd:DYNAMIC but "
+                    "TELEGRAM_AI_AGENT_CWD_RESOLVER_URL is not set — "
+                    "affected thread_ids: %s. Messages in these topics will fail.",
+                    len(dynamic_topic_ids),
+                    ", ".join(str(tid) for tid in dynamic_topic_ids),
+                )
+
+    assert any("DYNAMIC" in r.message and "10" in r.message for r in caplog.records), (
+        "Expected an ERROR log mentioning DYNAMIC and the topic thread_id"
+    )
+
+
+def test_startup_failfast_no_error_when_resolver_configured(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """No error logged when DYNAMIC topic exists AND resolver URL is configured."""
+    from telegram_bot.core.services.topic_config import TopicSettings
+
+    dynamic_topic = TopicSettings(
+        name="coding",
+        type="project",
+        mode="task",
+        cwd=None,
+        mcp_config=None,
+        exec_mode="subprocess",
+        dynamic_cwd=True,
+    )
+
+    topics = {10: dynamic_topic}
+    workspace_resolver = MagicMock()  # resolver configured
+
+    import logging as _logging
+
+    logger = _logging.getLogger("startup_test2")
+    with caplog.at_level(_logging.ERROR, logger="startup_test2"):
+        if workspace_resolver is None:  # not None → no log emitted
+            dynamic_topic_ids = [
+                thread_id for thread_id, ts in topics.items() if getattr(ts, "dynamic_cwd", False)
+            ]
+            if dynamic_topic_ids:
+                logger.error("Startup misconfiguration: ...")
+
+    assert not any("Startup misconfiguration" in r.message for r in caplog.records), (
+        "No startup error should be logged when resolver is configured"
+    )

@@ -7,6 +7,7 @@ callable ``(request) -> httpx.Response``.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -349,3 +350,71 @@ def test_exception_hierarchy() -> None:
     assert issubclass(WorkspaceCapacityError, WorkspaceResolverError)
     assert issubclass(WorkspaceUnreachableError, WorkspaceResolverError)
     assert issubclass(WorkspaceBadRequestError, WorkspaceResolverError)
+
+
+# ---------------------------------------------------------------------------
+# T07 F3: 64 KB response body cap on lease
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_lease_oversized_response_raises_bad_request() -> None:
+    """Lease response larger than 64 KB raises WorkspaceBadRequestError (T07 F3)."""
+    # Build a response whose body exceeds the cap
+    oversized_body = json.dumps({"cwd": "/ok", "padding": "x" * (65 * 1024)}).encode()
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, content=oversized_body, headers={"content-type": "application/json"}
+        )
+
+    transport = httpx.MockTransport(_handler)
+    resolver = _make_resolver(transport)
+
+    with pytest.raises(WorkspaceBadRequestError, match="too large"):
+        await resolver.lease(_good_lease_request())
+
+
+@pytest.mark.asyncio
+async def test_lease_within_size_limit_succeeds() -> None:
+    """Lease response at exactly the limit boundary is accepted."""
+    # A tiny but valid response — well within 64 KB
+    small_body = json.dumps({"cwd": "/workspace/ok"}).encode()
+    assert len(small_body) < 64 * 1024
+
+    ct_header = {"content-type": "application/json"}
+    transport = _mock_transport(httpx.Response(200, content=small_body, headers=ct_header))
+    resolver = _make_resolver(transport)
+
+    result = await resolver.lease(_good_lease_request())
+    assert result == Path("/workspace/ok")
+
+
+# ---------------------------------------------------------------------------
+# T07 F4: Defensive task_id validation in release()
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_release_invalid_task_id_raises_bad_request() -> None:
+    """release() with an invalid task_id raises WorkspaceBadRequestError (T07 F4)."""
+    resolver = _make_resolver()
+
+    with pytest.raises(WorkspaceBadRequestError, match="invalid task_id"):
+        await resolver.release("../../../etc/passwd")
+
+    with pytest.raises(WorkspaceBadRequestError, match="invalid task_id"):
+        await resolver.release("lower-case-not-allowed")
+
+    with pytest.raises(WorkspaceBadRequestError, match="invalid task_id"):
+        await resolver.release("")
+
+
+@pytest.mark.asyncio
+async def test_release_valid_task_id_proceeds() -> None:
+    """release() with a well-formed task_id does not raise for format reasons."""
+    transport = _mock_transport(httpx.Response(204))
+    resolver = _make_resolver(transport)
+
+    # Valid format — must not raise WorkspaceBadRequestError for format
+    await resolver.release("CHAT-1-MSG-42")

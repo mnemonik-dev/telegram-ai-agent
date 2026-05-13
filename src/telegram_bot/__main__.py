@@ -5,6 +5,7 @@ import logging
 import signal
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ChatType
@@ -101,12 +102,11 @@ async def process_queue_item(
     # Resolve runtime config to detect cwd:DYNAMIC for this topic.
     chat_id, thread_id = channel_key
     topic_settings = topic_config.get_topic(thread_id)
-    default_cwd = session_manager._default_cwd()
     runtime = resolve_topic_runtime_config(
         topic_settings,
         BotDefaults(
-            cwd=default_cwd,
-            mcp_config=Path(session_manager._settings.project_root) / ".mcp.bot.json",
+            cwd=session_manager.default_cwd(),
+            mcp_config=Path(session_manager.default_mcp_config_path()),
         ),
     )
 
@@ -144,16 +144,18 @@ async def process_queue_item(
             repo=runtime.repo or "default",
             topic_name=runtime.topic_name or str(thread_id or "main"),
         ) as resolved_cwd:
-            # Temporarily override session.cwd so the engine subprocess runs
-            # in the leased directory.  SessionManager._apply_topic_config
-            # would set it to defaults.cwd for DYNAMIC topics (cwd=None path);
-            # we shadow that for the duration of this single invocation.
-            if runtime.dynamic_cwd:
-                session_data = session_manager._sessions.get(channel_key)
-                if session_data is not None:
-                    session_data.cwd = str(resolved_cwd)
+            # Pass the leased path as an explicit cwd_override so it wins over
+            # any _apply_topic_config reset inside SessionManager.send_stream.
+            # DYNAMIC topics have topic.cwd=None, so _apply_topic_config would
+            # otherwise fall back to defaults.cwd, silently breaking isolation.
+            effective_cwd_override = resolved_cwd if runtime.dynamic_cwd else None
             await send_streaming_response(
-                reply_message, session_manager, channel_key, prompt, tmux_manager=tmux_manager
+                reply_message,
+                session_manager,
+                channel_key,
+                prompt,
+                tmux_manager=tmux_manager,
+                cwd_override=effective_cwd_override,
             )
     except WorkspaceCapacityError:
         logger.warning("workspace pool busy for channel %s, engine not spawned", channel_key)
@@ -205,9 +207,37 @@ async def _start() -> None:
     forward_batcher = ForwardBatcher(bot=bot)
     workspace_resolver = resolver_from_settings(settings)
     if workspace_resolver is not None:
-        logger.info("Workspace resolver configured: %s", settings.workspace_resolver_url)
+        # Strip userinfo/path/query from URL before logging — operator may embed
+        # credentials in the URL (RFC 3986 userinfo e.g. http://user:token@host).
+        # _u.netloc includes userinfo; use hostname + port to get only host:port.
+        _u = urlsplit(settings.workspace_resolver_url or "")
+        _host_part = _u.hostname or ""
+        if _u.port is not None:
+            _host_part = f"{_host_part}:{_u.port}"
+        _safe_url = f"{_u.scheme}://{_host_part}" if _host_part else "(configured)"
+        logger.info("Workspace resolver configured at %s", _safe_url)
     else:
         logger.info("No workspace resolver URL configured (cwd:DYNAMIC topics unsupported)")
+
+    # Startup fail-fast: any DYNAMIC topic without a resolver URL is a
+    # misconfiguration that would only surface when the first user message
+    # arrives.  Detect and log it here so operators see it at boot, not at
+    # runtime.
+    if workspace_resolver is None:
+        _dynamic_topic_ids = [
+            thread_id
+            for thread_id, ts in topic_config._topics.items()
+            if getattr(ts, "dynamic_cwd", False)
+        ]
+        if _dynamic_topic_ids:
+            logger.error(
+                "Startup misconfiguration: %d topic(s) have cwd:DYNAMIC but "
+                "TELEGRAM_AI_AGENT_CWD_RESOLVER_URL is not set — "
+                "affected thread_ids: %s. Messages in these topics will fail with a "
+                "WorkspaceConfigError until the resolver URL is configured.",
+                len(_dynamic_topic_ids),
+                ", ".join(str(tid) for tid in _dynamic_topic_ids),
+            )
 
     async def _process_queue_item(
         channel_key: ChannelKey,

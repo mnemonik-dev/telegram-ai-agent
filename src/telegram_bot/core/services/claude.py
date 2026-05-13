@@ -225,6 +225,14 @@ class SessionManager:
         """Default MCP config path used by bot-launched sessions."""
         return str(default_bot_mcp_config(self._settings.project_root))
 
+    def default_cwd(self) -> Path:
+        """Public accessor for the default agent working directory.
+
+        Delegates to ``_default_cwd`` so callers in ``__main__`` can resolve
+        the DYNAMIC flow without accessing private attributes.
+        """
+        return self._default_cwd()
+
     def _default_cwd(self) -> Path:
         """Default agent working directory, resolved relative to project_root."""
         configured = Path(self._settings.default_cwd)
@@ -415,13 +423,31 @@ class SessionManager:
         )
         return _get_mode_prompt(mode) + tg_context + prompt
 
-    def _build_exec_command(self, prompt: str, session: SessionData) -> ExecCommand:
+    def _build_exec_command(
+        self,
+        prompt: str,
+        session: SessionData,
+        cwd_override: Path | None = None,
+    ) -> ExecCommand:
         """Provider-aware subprocess command.
 
         Claude keeps the historical argv-prompt contract. Codex receives the
         prompt via stdin and writes the final answer to a unique temp file.
+
+        Parameters
+        ----------
+        cwd_override:
+            When provided, this path is used as the subprocess working directory
+            instead of ``session.cwd``.  Used by the DYNAMIC cwd flow to pass
+            the leased workspace path after ``_apply_topic_config`` has already
+            run (which would otherwise reset ``session.cwd`` to ``defaults.cwd``
+            for topics whose ``topic.cwd is None``).
         """
-        cwd = session.cwd or str(self._default_cwd())
+        cwd = (
+            str(cwd_override)
+            if cwd_override is not None
+            else (session.cwd or str(self._default_cwd()))
+        )
         if session.engine != "codex":
             return ExecCommand(
                 argv=self._build_command(
@@ -598,8 +624,16 @@ class SessionManager:
         prompt: str,
         session: SessionData,
         on_event: Callable[[StreamEvent], Awaitable[None] | None],
+        cwd_override: Path | None = None,
     ) -> str:
-        """Run a CC subprocess, stream events via on_event, return final result."""
+        """Run a CC subprocess, stream events via on_event, return final result.
+
+        Parameters
+        ----------
+        cwd_override:
+            When set, overrides the subprocess working directory for this single
+            invocation.  See ``_build_exec_command`` for details.
+        """
         session_id = session.session_id
 
         if session_id is None and session.process is not None:
@@ -621,7 +655,7 @@ class SessionManager:
                 runtime_path=runtime_mcp_path,
                 project_root=self._settings.project_root,
             )
-            exec_cmd = self._build_exec_command(prompt, session)
+            exec_cmd = self._build_exec_command(prompt, session, cwd_override=cwd_override)
         except Exception:
             session.mcp_config = original_mcp_config
             if runtime_mcp_path is not None:
@@ -902,6 +936,7 @@ class SessionManager:
         on_event: Callable[[StreamEvent], Awaitable[None] | None],
         *,
         on_engine_changed: Callable[[str], Awaitable[None]] | None = None,
+        cwd_override: Path | None = None,
     ) -> str:
         """Send a prompt to CC with streaming events. Returns final response text.
 
@@ -910,6 +945,10 @@ class SessionManager:
         responsible for surfacing this to the user — same wording as a manual
         /engine switch — so the conversation does not silently move to a new
         provider mid-flight.
+
+        ``cwd_override`` pins the subprocess working directory for this single
+        invocation, winning over any ``_apply_topic_config`` reset.  Used by the
+        DYNAMIC cwd lease flow in ``__main__.process_queue_item``.
         """
         session = self._get_session(channel_key)
 
@@ -966,7 +1005,9 @@ class SessionManager:
 
             for attempt in range(2):
                 try:
-                    result = await self._run_cc_stream(prompt, session, on_event)
+                    result = await self._run_cc_stream(
+                        prompt, session, on_event, cwd_override=cwd_override
+                    )
                     if session.session_id:
                         self._channel_sessions[self._ch_key(channel_key)] = self._session_ref(
                             session.engine,
