@@ -29,6 +29,12 @@ class TopicRuntimeConfig:
     model: str | None
     exec_mode: ExecMode
     stream_mode: StreamMode
+    dynamic_cwd: bool = False
+    """True when cwd:DYNAMIC sentinel was set; actual path resolved at spawn time."""
+    topic_name: str = ""
+    """Topic name forwarded to the workspace resolver for tracing."""
+    repo: str | None = None
+    """Repo identifier forwarded to the workspace resolver (optional)."""
 
 
 def resolve_topic_runtime_config(
@@ -53,4 +59,7 @@ def resolve_topic_runtime_config(
         model=settings.model if settings.model is not None else defaults.model,
         exec_mode=settings.exec_mode or defaults.exec_mode,
         stream_mode=settings.stream_mode or defaults.stream_mode,
+        dynamic_cwd=settings.dynamic_cwd,
+        topic_name=settings.name,
+        repo=None,  # populated by caller when a repo override is needed
     )

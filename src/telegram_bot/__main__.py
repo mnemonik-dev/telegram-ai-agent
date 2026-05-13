@@ -28,10 +28,22 @@ from telegram_bot.core.messages import t
 from telegram_bot.core.middleware.auth import AuthMiddleware
 from telegram_bot.core.services.bot_commands import setup_bot_commands
 from telegram_bot.core.services.claude import SessionManager
+from telegram_bot.core.services.dynamic_cwd import (
+    MessageContext,
+    check_dynamic_cwd_preconditions,
+    dynamic_cwd_lease,
+)
 from telegram_bot.core.services.message_queue import MessageQueue
 from telegram_bot.core.services.tmux_manager import TmuxManager
 from telegram_bot.core.services.topic_config import TopicConfig
+from telegram_bot.core.services.topic_runtime import BotDefaults, resolve_topic_runtime_config
 from telegram_bot.core.services.transcriber import Transcriber
+from telegram_bot.core.services.workspace_resolver import (
+    WorkspaceCapacityError,
+    WorkspaceConfigError,
+    WorkspaceUnreachableError,
+    resolver_from_settings,
+)
 from telegram_bot.core.types import ChannelKey
 
 logger = logging.getLogger(__name__)
@@ -46,8 +58,15 @@ async def process_queue_item(
     bot: Bot,
     session_manager: SessionManager,
     tmux_manager: TmuxManager,
+    topic_config: TopicConfig,
+    workspace_resolver: object,  # WorkspaceResolver | None — avoid circular import hint
 ) -> None:
-    """Send a queued prompt to CC; on session change, notify the user."""
+    """Send a queued prompt to CC; on session change, notify the user.
+
+    For topics with ``cwd: DYNAMIC``, leases a per-message workspace from the
+    external resolver before spawning the engine and releases it in a finally
+    block covering engine exit, /cancel, timeout, and crash paths.
+    """
     old_session_id = session_manager.get_current_session_id(channel_key)
 
     # After kill/reset, ignore reply-to-resume on the next message.
@@ -78,9 +97,93 @@ async def process_queue_item(
     reply_message = source_messages[-1] if source_messages else None
     if reply_message is None:
         return
-    await send_streaming_response(
-        reply_message, session_manager, channel_key, prompt, tmux_manager=tmux_manager
+
+    # Resolve runtime config to detect cwd:DYNAMIC for this topic.
+    chat_id, thread_id = channel_key
+    topic_settings = topic_config.get_topic(thread_id)
+    default_cwd = session_manager._default_cwd()
+    runtime = resolve_topic_runtime_config(
+        topic_settings,
+        BotDefaults(
+            cwd=default_cwd,
+            mcp_config=Path(session_manager._settings.project_root) / ".mcp.bot.json",
+        ),
     )
+
+    # Fail-fast config checks before touching the resolver.
+    if runtime.dynamic_cwd:
+        try:
+            check_dynamic_cwd_preconditions(
+                dynamic_cwd=runtime.dynamic_cwd,
+                exec_mode=runtime.exec_mode,
+                resolver=workspace_resolver,  # type: ignore[arg-type]
+            )
+        except WorkspaceConfigError as exc:
+            logger.error(
+                "workspace config error for channel %s: %s", channel_key, exc
+            )
+            await bot.send_message(
+                chat_id,
+                t("ui.workspace_config_error", detail=str(exc)),
+                message_thread_id=thread_id,
+            )
+            return
+
+    # Build message context for task_id derivation.
+    msg_ctx = MessageContext(
+        chat_id=chat_id,
+        message_id=reply_message.message_id,
+        thread_id=thread_id,
+    )
+
+    # Lease workspace (no-op for static cwd topics).
+    try:
+        async with dynamic_cwd_lease(
+            resolver=workspace_resolver,  # type: ignore[arg-type]
+            dynamic_cwd=runtime.dynamic_cwd,
+            static_cwd=runtime.cwd,
+            message_context=msg_ctx,
+            repo=runtime.repo or "default",
+            topic_name=runtime.topic_name or str(thread_id or "main"),
+        ) as resolved_cwd:
+            # Temporarily override session.cwd so the engine subprocess runs
+            # in the leased directory.  SessionManager._apply_topic_config
+            # would set it to defaults.cwd for DYNAMIC topics (cwd=None path);
+            # we shadow that for the duration of this single invocation.
+            if runtime.dynamic_cwd:
+                session_data = session_manager._sessions.get(channel_key)
+                if session_data is not None:
+                    session_data.cwd = str(resolved_cwd)
+            await send_streaming_response(
+                reply_message, session_manager, channel_key, prompt, tmux_manager=tmux_manager
+            )
+    except WorkspaceCapacityError:
+        logger.warning(
+            "workspace pool busy for channel %s, engine not spawned", channel_key
+        )
+        await bot.send_message(
+            chat_id,
+            t("ui.workspace_pool_busy"),
+            message_thread_id=thread_id,
+        )
+    except WorkspaceUnreachableError:
+        logger.error(
+            "workspace resolver unreachable for channel %s, engine not spawned", channel_key
+        )
+        await bot.send_message(
+            chat_id,
+            t("ui.workspace_unreachable"),
+            message_thread_id=thread_id,
+        )
+    except WorkspaceConfigError as exc:
+        logger.error(
+            "workspace config error during spawn for channel %s: %s", channel_key, exc
+        )
+        await bot.send_message(
+            chat_id,
+            t("ui.workspace_config_error", detail=str(exc)),
+            message_thread_id=thread_id,
+        )
 
 
 async def _start() -> None:
@@ -106,6 +209,11 @@ async def _start() -> None:
     session_manager = SessionManager(settings, topic_config=topic_config)
     transcriber = Transcriber(settings)
     forward_batcher = ForwardBatcher(bot=bot)
+    workspace_resolver = resolver_from_settings(settings)
+    if workspace_resolver is not None:
+        logger.info("Workspace resolver configured: %s", settings.workspace_resolver_url)
+    else:
+        logger.info("No workspace resolver URL configured (cwd:DYNAMIC topics unsupported)")
 
     async def _process_queue_item(
         channel_key: ChannelKey,
@@ -121,6 +229,8 @@ async def _start() -> None:
             bot=bot,
             session_manager=session_manager,
             tmux_manager=tmux_manager,
+            topic_config=topic_config,
+            workspace_resolver=workspace_resolver,
         )
 
     message_queue = MessageQueue(bot, session_manager, _process_queue_item)

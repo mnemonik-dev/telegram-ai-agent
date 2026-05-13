@@ -164,6 +164,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ui.download_error": "Couldn't download the file, try again",
         "ui.file_too_large": "File is too large (max {size} MB)",
         "ui.forward_error": "Failed to process messages, try again",
+        "ui.workspace_pool_busy": (
+            "Workspace pool is busy, try again in a moment."
+        ),
+        "ui.workspace_unreachable": (
+            "Workspace resolver is unavailable (service error). Try again later."
+        ),
+        "ui.workspace_config_error": (
+            "Workspace configuration error: {detail}"
+        ),
         # --- UI: keyboard buttons -------------------------------------
         "ui.btn_new_chat": "New chat",
         "ui.btn_cancel": "Cancel ❌",
@@ -394,6 +403,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ui.download_error": "Не удалось скачать файл, попробуй ещё раз",
         "ui.file_too_large": "Файл слишком большой (максимум {size} МБ)",
         "ui.forward_error": "Не удалось обработать сообщения, попробуй ещё раз",
+        "ui.workspace_pool_busy": (
+            "Очередь воркспейсов занята, попробуй ещё раз через несколько секунд."
+        ),
+        "ui.workspace_unreachable": (
+            "Resolver воркспейсов недоступен (ошибка сервера). Попробуй позже."
+        ),
+        "ui.workspace_config_error": (
+            "Ошибка конфигурации воркспейса: {detail}"
+        ),
         # --- UI: keyboard buttons -------------------------------------
         "ui.btn_new_chat": "Новый чат",
         "ui.btn_cancel": "Отменить ❌",
