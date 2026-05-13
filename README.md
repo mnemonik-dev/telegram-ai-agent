@@ -241,6 +241,102 @@ Use absolute paths for `cwd` and `mcp_config`. Set `mcp_config` to `null`
 unless you already have a real MCP config file for that project. Do not commit
 your real `topic_config.json`.
 
+## Dynamic Cwd Resolution (Per-Task Sandboxing)
+
+When you want each Telegram message in a topic to spawn an isolated sandbox or
+git worktree instead of sharing one working directory, set `cwd` to the string
+`"DYNAMIC"` in topic config. The bot then asks an external HTTP resolver to
+lease a fresh `cwd` for the duration of a single agent invocation and releases
+it when the agent exits, the user runs `/cancel`, or the message times out.
+
+This is opt-in per topic. Topics with a normal absolute `cwd` keep the existing
+behavior and never call the resolver.
+
+### Setup
+
+1. Run an HTTP resolver that owns the worktree pool (any service that
+   implements the contract below; the bot does not ship one).
+2. Point the bot at it with the environment variable:
+
+   ```bash
+   TELEGRAM_AI_AGENT_CWD_RESOLVER_URL=http://your-resolver:port
+   ```
+
+3. Set `"cwd": "DYNAMIC"` for the relevant topic. The topic must use
+   `"exec_mode": "subprocess"`; `tmux` keeps a persistent shell bound to one
+   directory and is rejected at engine-spawn time when combined with `DYNAMIC`.
+
+### HTTP Contract
+
+The bot speaks two endpoints against the configured resolver URL.
+
+Lease a workspace for one message:
+
+```
+POST /worktree
+Content-Type: application/json
+
+{
+  "task_id":  "C42M100",         // unique per Telegram message
+  "repo":     "my-org/my-repo",  // free-form; comes from topic name/config
+  "base_ref": "main",
+  "topic":    "My Project"
+}
+
+200 OK
+{ "cwd": "/abs/path/to/leased/worktree" }
+```
+
+Release the workspace when the agent finishes:
+
+```
+DELETE /worktree/{task_id}
+204 No Content        // also accepts 404 as idempotent
+```
+
+The bot retries `5xx` and network errors three times with exponential backoff
+(1 s / 2 s / 4 s). `4xx` other than `409` is fail-fast.
+
+### Failure Modes
+
+- `409 Conflict` — pool is full. The bot replies in Telegram that the
+  workspace pool is busy and asks the user to retry later. No agent is spawned.
+- `5xx` or network error after retries — the resolver is unreachable. The bot
+  reports the error to the topic and skips the message; no partial lease is left
+  behind.
+- Missing `TELEGRAM_AI_AGENT_CWD_RESOLVER_URL` while a topic uses
+  `cwd: "DYNAMIC"` — fail-fast at engine spawn with an explicit message asking
+  the operator to configure the resolver.
+- `cwd: "DYNAMIC"` combined with `exec_mode: "tmux"` — rejected at engine
+  spawn with a message asking to switch the topic to `subprocess`.
+
+All lease releases run in a `finally` block, so normal exit, `/cancel`,
+timeouts, and crashes all return the workspace to the pool.
+
+### Example topic_config.json fragment
+
+```json
+{
+  "topics": {
+    "100": {
+      "name": "Sandbox Tasks",
+      "type": "project",
+      "mode": "task",
+      "cwd": "DYNAMIC",
+      "mcp_config": null,
+      "stream_mode": "live",
+      "exec_mode": "subprocess",
+      "engine": "claude",
+      "model": null
+    }
+  }
+}
+```
+
+See `.claude/skills/project-knowledge/references/architecture.md` and
+`.claude/skills/project-knowledge/references/configuration.md` for the code-
+level entry points.
+
 ## Prompt Modes
 
 Prompt files live in `src/telegram_bot/prompts/`.

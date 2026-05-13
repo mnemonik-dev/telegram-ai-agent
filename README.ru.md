@@ -244,6 +244,103 @@ skill настроить topics.
 `null`, если у вас еще нет настоящего MCP config file для проекта. Не коммитьте
 настоящий `topic_config.json`.
 
+## Dynamic Cwd Resolution (Per-Task Sandboxing)
+
+Если для каждого сообщения в topic нужен изолированный sandbox или git
+worktree, а не общая рабочая директория, поставьте в topic config
+`cwd: "DYNAMIC"`. Бот тогда обращается к внешнему HTTP resolver, чтобы
+арендовать свежий `cwd` на время одного запуска агента, и освобождает его,
+когда агент завершился, пользователь вызвал `/cancel` или сообщение упало по
+таймауту.
+
+Это opt-in на уровне topic. Topics с обычным absolute `cwd` работают как
+раньше и в resolver не ходят.
+
+### Настройка
+
+1. Поднимите HTTP resolver, который владеет пулом worktree (любой сервис,
+   реализующий контракт ниже; бот сам resolver не поставляет).
+2. Укажите боту его адрес через переменную окружения:
+
+   ```bash
+   TELEGRAM_AI_AGENT_CWD_RESOLVER_URL=http://your-resolver:port
+   ```
+
+3. Поставьте `"cwd": "DYNAMIC"` в нужном topic. Этот topic должен использовать
+   `"exec_mode": "subprocess"`; `tmux` держит постоянный shell, привязанный к
+   одной директории, и комбинация `DYNAMIC` + `tmux` отклоняется на этапе
+   engine spawn.
+
+### HTTP-контракт
+
+Бот ходит к двум endpoints на указанный resolver URL.
+
+Аренда workspace на одно сообщение:
+
+```
+POST /worktree
+Content-Type: application/json
+
+{
+  "task_id":  "C42M100",         // уникальный per Telegram message
+  "repo":     "my-org/my-repo",  // свободная строка из topic name/config
+  "base_ref": "main",
+  "topic":    "My Project"
+}
+
+200 OK
+{ "cwd": "/abs/path/to/leased/worktree" }
+```
+
+Освобождение после завершения агента:
+
+```
+DELETE /worktree/{task_id}
+204 No Content        // 404 трактуется как idempotent
+```
+
+Бот ретраит `5xx` и network errors три раза с exponential backoff
+(1 с / 2 с / 4 с). `4xx` кроме `409` - fail-fast без retry.
+
+### Сценарии ошибок
+
+- `409 Conflict` - пул занят. Бот пишет в Telegram, что workspace pool
+  заполнен, и просит повторить позже. Агент не запускается.
+- `5xx` или network error после retry - resolver недоступен. Бот сообщает об
+  ошибке в topic и пропускает сообщение; "висящих" lease не остается.
+- Не выставлен `TELEGRAM_AI_AGENT_CWD_RESOLVER_URL`, но topic использует
+  `cwd: "DYNAMIC"` - fail-fast на engine spawn с явным сообщением оператору
+  настроить resolver.
+- `cwd: "DYNAMIC"` вместе с `exec_mode: "tmux"` - отклоняется на engine spawn
+  с просьбой переключить topic на `subprocess`.
+
+Все release выполняются в `finally`, поэтому нормальное завершение, `/cancel`,
+timeout и crash одинаково возвращают workspace в пул.
+
+### Пример фрагмента `topic_config.json`
+
+```json
+{
+  "topics": {
+    "100": {
+      "name": "Sandbox Tasks",
+      "type": "project",
+      "mode": "task",
+      "cwd": "DYNAMIC",
+      "mcp_config": null,
+      "stream_mode": "live",
+      "exec_mode": "subprocess",
+      "engine": "claude",
+      "model": null
+    }
+  }
+}
+```
+
+Подробности на уровне кода - в
+`.claude/skills/project-knowledge/references/architecture.md` и
+`.claude/skills/project-knowledge/references/configuration.md`.
+
 ## Prompt Modes
 
 Prompt files лежат в `src/telegram_bot/prompts/`.
