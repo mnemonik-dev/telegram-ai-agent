@@ -49,8 +49,7 @@ class Settings(BaseSettings):
             "TELEGRAM_AI_AGENT_CWD_RESOLVER_URL",
         ),
         description=(
-            "HTTP resolver URL for cwd:DYNAMIC topics. "
-            "Required when any topic uses cwd:DYNAMIC."
+            "HTTP resolver URL for cwd:DYNAMIC topics. Required when any topic uses cwd:DYNAMIC."
         ),
     )
 

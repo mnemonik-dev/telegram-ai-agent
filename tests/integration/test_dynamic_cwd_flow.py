@@ -50,6 +50,7 @@ def _json_response(status: int, body: object) -> httpx.Response:
 
 def _lease_ok(cwd: str = "/workspace/resolved") -> httpx.MockTransport:
     """Transport that returns 200 on POST and 204 on DELETE (happy-path)."""
+
     def _handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             return _json_response(200, {"cwd": cwd})
@@ -117,17 +118,13 @@ def test_dynamic_plus_tmux_raises_config_error() -> None:
     """DYNAMIC + tmux raises WorkspaceConfigError at precondition check."""
     resolver = MagicMock(spec=WorkspaceResolver)
     with pytest.raises(WorkspaceConfigError, match="incompatible with exec_mode:tmux"):
-        check_dynamic_cwd_preconditions(
-            dynamic_cwd=True, exec_mode="tmux", resolver=resolver
-        )
+        check_dynamic_cwd_preconditions(dynamic_cwd=True, exec_mode="tmux", resolver=resolver)
 
 
 def test_dynamic_without_resolver_raises_config_error() -> None:
     """DYNAMIC with no resolver URL raises WorkspaceConfigError."""
     with pytest.raises(WorkspaceConfigError, match="TELEGRAM_AI_AGENT_CWD_RESOLVER_URL"):
-        check_dynamic_cwd_preconditions(
-            dynamic_cwd=True, exec_mode="subprocess", resolver=None
-        )
+        check_dynamic_cwd_preconditions(dynamic_cwd=True, exec_mode="subprocess", resolver=None)
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +206,7 @@ async def test_dynamic_cwd_topic_calls_lease_then_release() -> None:
 
 async def test_dynamic_cwd_409_raises_capacity_error() -> None:
     """409 from resolver propagates as WorkspaceCapacityError before engine spawn."""
+
     def _handler(request: httpx.Request) -> httpx.Response:
         return _json_response(409, {"error": "capacity"})
 
@@ -236,6 +234,7 @@ async def test_dynamic_cwd_409_raises_capacity_error() -> None:
 
 async def test_dynamic_cwd_5xx_exhausted_raises_unreachable() -> None:
     """5xx retries exhausted → WorkspaceUnreachableError before engine spawn."""
+
     def _handler(request: httpx.Request) -> httpx.Response:
         return _json_response(500, {"error": "internal"})
 
@@ -291,9 +290,7 @@ def test_dynamic_cwd_plus_tmux_raises_clear_error() -> None:
     """DYNAMIC + tmux exec_mode raises WorkspaceConfigError with clear message."""
     resolver = _make_resolver(_lease_ok())
     with pytest.raises(WorkspaceConfigError) as exc_info:
-        check_dynamic_cwd_preconditions(
-            dynamic_cwd=True, exec_mode="tmux", resolver=resolver
-        )
+        check_dynamic_cwd_preconditions(dynamic_cwd=True, exec_mode="tmux", resolver=resolver)
     assert "tmux" in str(exc_info.value)
     assert "subprocess" in str(exc_info.value)
 
@@ -377,7 +374,5 @@ async def test_release_failure_logged_does_not_mask_engine_error(
 
     # The original engine error must propagate, not a WorkspaceUnreachableError
     # Release failure must be logged as a warning, not raised
-    release_warning = any(
-        "workspace release failed" in r.message for r in caplog.records
-    )
+    release_warning = any("workspace release failed" in r.message for r in caplog.records)
     assert release_warning, "Expected a warning log about release failure"

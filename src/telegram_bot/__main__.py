@@ -119,9 +119,7 @@ async def process_queue_item(
                 resolver=workspace_resolver,  # type: ignore[arg-type]
             )
         except WorkspaceConfigError as exc:
-            logger.error(
-                "workspace config error for channel %s: %s", channel_key, exc
-            )
+            logger.error("workspace config error for channel %s: %s", channel_key, exc)
             await bot.send_message(
                 chat_id,
                 t("ui.workspace_config_error", detail=str(exc)),
@@ -158,9 +156,7 @@ async def process_queue_item(
                 reply_message, session_manager, channel_key, prompt, tmux_manager=tmux_manager
             )
     except WorkspaceCapacityError:
-        logger.warning(
-            "workspace pool busy for channel %s, engine not spawned", channel_key
-        )
+        logger.warning("workspace pool busy for channel %s, engine not spawned", channel_key)
         await bot.send_message(
             chat_id,
             t("ui.workspace_pool_busy"),
@@ -176,9 +172,7 @@ async def process_queue_item(
             message_thread_id=thread_id,
         )
     except WorkspaceConfigError as exc:
-        logger.error(
-            "workspace config error during spawn for channel %s: %s", channel_key, exc
-        )
+        logger.error("workspace config error during spawn for channel %s: %s", channel_key, exc)
         await bot.send_message(
             chat_id,
             t("ui.workspace_config_error", detail=str(exc)),
