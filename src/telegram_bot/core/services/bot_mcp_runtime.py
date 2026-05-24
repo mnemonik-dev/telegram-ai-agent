@@ -41,6 +41,32 @@ def _standard_bot_server(project_root: Path) -> dict[str, Any]:
     }
 
 
+def _kaneo_server_from_env() -> dict[str, Any] | None:
+    """Build a remote-HTTP MCP server entry for Kaneo when env is configured.
+
+    Returns ``None`` if either ``KANEO_MCP_URL`` or ``KANEO_MCP_BEARER`` is
+    unset. This is intentional: bots that don't need ticket integration
+    keep the public-generic config (no Kaneo dependency).
+
+    Kaneo's MCP server is an HTTP streamable transport (see usekaneo/kaneo
+    apps/api/src/mcp/index.ts: WebStandardStreamableHTTPServerTransport),
+    so we register it via the ``type: "http"`` MCP server shape supported
+    by claude-code's --mcp-config. The bearer is a session token obtained
+    via Kaneo's device code flow (POST /api/auth/device/code → operator
+    approves in browser → POST /api/auth/device/token); see the operator
+    helper script in the deploy repo for the one-time pairing UX.
+    """
+    url = os.environ.get("KANEO_MCP_URL", "").strip()
+    bearer = os.environ.get("KANEO_MCP_BEARER", "").strip()
+    if not url or not bearer:
+        return None
+    return {
+        "type": "http",
+        "url": url,
+        "headers": {"Authorization": f"Bearer {bearer}"},
+    }
+
+
 def _project_root_from_base(base_path: Path | None, project_root: str | Path | None) -> Path:
     if project_root is not None:
         return Path(project_root)
@@ -96,6 +122,14 @@ def ensure_bot_runtime_mcp_config(
     env["TELEGRAM_CONTEXT_LOCK"] = "1"
     bot_server["env"] = env
     servers["bot"] = bot_server
+
+    # Inject Kaneo's remote-HTTP MCP server when the deployment has paired
+    # this bot to Kaneo via the device code flow. Absent the env vars,
+    # leave the existing entry (if any) untouched — operators may have
+    # configured Kaneo manually in the base .mcp.bot.json.
+    kaneo_server = _kaneo_server_from_env()
+    if kaneo_server is not None:
+        servers["kaneo"] = kaneo_server
 
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     os.chmod(runtime_path.parent, _RUNTIME_DIR_MODE)

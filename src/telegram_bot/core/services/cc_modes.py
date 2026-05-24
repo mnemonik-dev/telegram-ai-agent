@@ -56,11 +56,22 @@ DEFAULT_MODE: Mode = "free"
 
 _BOT_MCP_TOOLS = "mcp__bot__send_message,mcp__bot__send_image,mcp__bot__send_document"
 
-TASK_MODE_TOOLS = f"Skill,{_BOT_MCP_TOOLS},Read,Grep,Glob,Bash,Agent"
-KNOWLEDGE_MODE_TOOLS = f"Skill,{_BOT_MCP_TOOLS},Read,Write,Edit,Grep,Glob,Bash,Agent"
-FREE_MODE_TOOLS = f"Skill,{_BOT_MCP_TOOLS},Read,Write,Edit,Grep,Glob,Bash,Agent"
-PROJECT_MODE_TOOLS = f"{_BOT_MCP_TOOLS},Read,Write,Edit,Grep,Glob,Bash,Agent,Skill"
-BLOG_MODE_TOOLS = f"Skill,{_BOT_MCP_TOOLS},Read,Write,Edit,Grep,Glob,Bash,Agent"
+# Allow the entire Kaneo MCP server's toolset (whoami, list_workspaces,
+# create_task, update_task_status, move_task, create_task_comment, etc. —
+# 18 tools per apps/api/src/mcp/tools.ts in usekaneo/kaneo). Kaneo's MCP
+# server is only spawned when KANEO_MCP_URL + KANEO_MCP_BEARER are set in
+# the bot env (see bot_mcp_runtime._kaneo_server_from_env); when unset
+# the tools simply won't be available at session-start time, so leaving
+# this in every mode is safe for bots that haven't been paired.
+_KANEO_MCP_TOOLS = "mcp__kaneo"
+_COMMON = f"Skill,{_BOT_MCP_TOOLS},{_KANEO_MCP_TOOLS}"
+_RW = "Read,Write,Edit,Grep,Glob,Bash,Agent"
+
+TASK_MODE_TOOLS = f"{_COMMON},Read,Grep,Glob,Bash,Agent"
+KNOWLEDGE_MODE_TOOLS = f"{_COMMON},{_RW}"
+FREE_MODE_TOOLS = f"{_COMMON},{_RW}"
+PROJECT_MODE_TOOLS = f"{_BOT_MCP_TOOLS},{_KANEO_MCP_TOOLS},{_RW},Skill"
+BLOG_MODE_TOOLS = f"{_COMMON},{_RW}"
 
 _MODE_TOOLS: dict[str, str] = {
     "task": TASK_MODE_TOOLS,
