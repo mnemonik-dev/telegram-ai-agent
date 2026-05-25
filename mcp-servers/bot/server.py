@@ -259,5 +259,57 @@ def send_image(
     return result
 
 
+@mcp.tool()
+def create_topic(
+    name: str,
+    chat_id: int | None = None,
+    icon_color: int | None = None,
+) -> str:
+    """Create a new forum topic in the Telegram chat. Returns the message_thread_id.
+
+    The bot must be admin on the chat with "Manage topics" permission. In
+    bot-launched sessions chat_id defaults to TELEGRAM_CHAT_ID env (the
+    forum supergroup); operators can override per-call but TELEGRAM_CONTEXT_LOCK=1
+    still enforces same-chat for safety.
+
+    icon_color is one of the 7 Telegram-supported integers (e.g. 16711680 red,
+    255 blue, 65280 green). When omitted Telegram picks one.
+
+    Returns a JSON-shaped string: '{"thread_id": N, "name": "..."}'
+    or 'Ошибка: ...' on failure.
+    """
+    token = os.environ.get("BOT_TOKEN", "")
+    if not token:
+        return "Ошибка: BOT_TOKEN не настроен"
+    resolved_chat, _resolved_thread, error = _resolve_routing(chat_id=chat_id)
+    if error:
+        return error
+    assert resolved_chat is not None
+    name = (name or "").strip()
+    if not name:
+        return "Ошибка: имя топика обязательно"
+    if len(name) > 128:
+        # Telegram limit is 128 chars; trim silently rather than fail.
+        name = name[:128]
+
+    url = f"{_TELEGRAM_API}/bot{token}/createForumTopic"
+    payload: dict[str, object] = {"chat_id": resolved_chat, "name": name}
+    if icon_color is not None:
+        payload["icon_color"] = icon_color
+    try:
+        r = httpx.post(url, json=payload, timeout=15)
+    except httpx.HTTPError as exc:
+        return f"Ошибка: HTTP {exc}"
+    if r.status_code >= 400:
+        return f"Ошибка: createForumTopic HTTP {r.status_code}: {r.text[:300]}"
+    data = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    if not data.get("ok"):
+        return f"Ошибка: Telegram ответил {data!r}"
+    thread_id = data.get("result", {}).get("message_thread_id")
+    if thread_id is None:
+        return f"Ошибка: Telegram не вернул message_thread_id: {data!r}"
+    return f'{{"thread_id": {thread_id}, "name": {name!r}}}'
+
+
 if __name__ == "__main__":
     mcp.run()

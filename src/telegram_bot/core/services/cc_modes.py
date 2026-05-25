@@ -54,7 +54,9 @@ DEFAULT_MODE: Mode = "free"
 # Core keeps only generic tools. Assistant-specific MCP tools are attached
 # by the private entry point via SessionManager.extend_mode_tools.
 
-_BOT_MCP_TOOLS = "mcp__bot__send_message,mcp__bot__send_image,mcp__bot__send_document"
+_BOT_MCP_TOOLS = (
+    "mcp__bot__send_message,mcp__bot__send_image,mcp__bot__send_document,mcp__bot__create_topic"
+)
 
 # Allow the entire Kaneo MCP server's toolset (whoami, list_workspaces,
 # create_task, update_task_status, move_task, create_task_comment, etc. —
