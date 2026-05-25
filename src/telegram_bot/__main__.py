@@ -27,7 +27,7 @@ from telegram_bot.core.handlers.voice import router as voice_router
 from telegram_bot.core.keyboards import topic_keyboard
 from telegram_bot.core.messages import t
 from telegram_bot.core.middleware.auth import AuthMiddleware
-from telegram_bot.core.services.bot_commands import setup_bot_commands
+from telegram_bot.core.services.bot_commands import MOLYANOV_BOT_COMMANDS, setup_bot_commands
 from telegram_bot.core.services.claude import SessionManager
 from telegram_bot.core.services.dynamic_cwd import (
     MessageContext,
@@ -192,7 +192,13 @@ async def _start() -> None:
     settings = get_settings()
     bot = Bot(token=settings.telegram_bot_token)
     try:
-        await setup_bot_commands(bot)
+        # MOLYANOV_BOT_COMMANDS surfaces the Molyanov skill bundle's
+        # slash-commands (/tech-spec-planning, /do-task, /code-writing, ...)
+        # in Telegram's `/` autocomplete. The actual claude-side dispatch
+        # happens via the Skill tool — claude reads the text message
+        # verbatim (including the leading slash) and matches it against
+        # $HOME/.claude/{skills,commands}.
+        await setup_bot_commands(bot, extra_commands=MOLYANOV_BOT_COMMANDS)
     except Exception:
         logger.warning("Failed to set Telegram bot commands", exc_info=True)
 

@@ -51,6 +51,77 @@ PUBLIC_BOT_COMMANDS: tuple[LocalizedBotCommand, ...] = (
 )
 
 
+# Claude-side skill commands (Molyanov methodology) shipped via the
+# claude-skills bundle in $HOME/.claude/{skills,commands}. Telegram
+# doesn't natively know these — registering them in setMyCommands just
+# makes them discoverable in the `/` autocomplete. The actual text
+# message still flows through to claude verbatim (aiogram's Command()
+# router has no matching handler, so it falls through to the default
+# text path); claude then invokes the matching skill via its Skill tool.
+MOLYANOV_BOT_COMMANDS: tuple[LocalizedBotCommand, ...] = (
+    LocalizedBotCommand(
+        "user-spec-planning",
+        "Создать user-spec фичи (Molyanov)",
+        "Plan a feature's user-spec (Molyanov)",
+    ),
+    LocalizedBotCommand(
+        "tech-spec-planning",
+        "Создать tech-spec из user-spec",
+        "Plan a tech-spec from a user-spec",
+    ),
+    LocalizedBotCommand(
+        "decompose-tech-spec",
+        "Разбить tech-spec на задачи",
+        "Decompose a tech-spec into tasks",
+    ),
+    LocalizedBotCommand(
+        "do-task",
+        "Выполнить задачу из tasks/<NN>.md",
+        "Execute a task from tasks/<NN>.md",
+    ),
+    LocalizedBotCommand(
+        "do-feature",
+        "Выполнить фичу командой агентов",
+        "Execute a feature with an agent team",
+    ),
+    LocalizedBotCommand(
+        "write-code",
+        "Написать код через TDD и ревью",
+        "Write code with TDD and review",
+    ),
+    LocalizedBotCommand(
+        "code-reviewing",
+        "Провести ревью кода",
+        "Review code",
+    ),
+    LocalizedBotCommand(
+        "test-master",
+        "Стратегия тестирования / ревью тестов",
+        "Testing strategy / test review",
+    ),
+    LocalizedBotCommand(
+        "security-auditor",
+        "Аудит безопасности (OWASP)",
+        "Security audit (OWASP)",
+    ),
+    LocalizedBotCommand(
+        "pre-deploy-qa",
+        "Приёмочное тестирование перед деплоем",
+        "Pre-deploy acceptance testing",
+    ),
+    LocalizedBotCommand(
+        "post-deploy-qa",
+        "Верификация после деплоя",
+        "Post-deploy verification",
+    ),
+    LocalizedBotCommand(
+        "done",
+        "Завершить фичу: документация и архив",
+        "Finalize a feature: docs + archive",
+    ),
+)
+
+
 def build_bot_commands(
     language_code: str,
     *,

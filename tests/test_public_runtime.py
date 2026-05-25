@@ -151,8 +151,11 @@ def test_public_bot_command_menu_is_public_only() -> None:
 def test_public_start_registers_bot_commands() -> None:
     source = Path("src/telegram_bot/__main__.py").read_text(encoding="utf-8")
 
-    assert "setup_bot_commands(bot)" in source
-    assert source.index("setup_bot_commands(bot)") < source.index("dp.start_polling")
+    # Loosened from `setup_bot_commands(bot)` to allow extra kwargs (e.g.
+    # extra_commands=MOLYANOV_BOT_COMMANDS) — the contract is that the
+    # call happens with `bot` as the first arg before polling starts.
+    assert "setup_bot_commands(bot" in source
+    assert source.index("setup_bot_commands(bot") < source.index("dp.start_polling")
 
 
 def test_mcp_bot_server_imports() -> None:
