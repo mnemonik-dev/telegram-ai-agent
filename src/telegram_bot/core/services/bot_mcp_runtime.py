@@ -41,6 +41,31 @@ def _standard_bot_server(project_root: Path) -> dict[str, Any]:
     }
 
 
+def _github_server_from_env() -> dict[str, Any] | None:
+    """Build a remote-HTTP MCP server entry for GitHub when env is configured.
+
+    Uses GitHub's hosted MCP server at https://api.githubcopilot.com/mcp/
+    with a Personal Access Token (PAT) in the Authorization header — same
+    shape the github/github-mcp-server README documents for PAT auth.
+
+    Set ``GITHUB_PERSONAL_ACCESS_TOKEN`` to a PAT with at minimum
+    ``repo`` scope (for create_repository, push, PR ops). The bot's
+    claude session gets the full GitHub MCP toolset (~80 tools) so it
+    can spin up new repos as part of the operator's intent — e.g.
+    "new task in a fresh repo: build X" creates the GitHub repo,
+    binds it to a Kaneo project, and opens the ticket in one turn.
+    """
+    token = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN", "").strip()
+    if not token:
+        return None
+    url = os.environ.get("GITHUB_MCP_URL", "https://api.githubcopilot.com/mcp/").strip()
+    return {
+        "type": "http",
+        "url": url,
+        "headers": {"Authorization": f"Bearer {token}"},
+    }
+
+
 def _kaneo_server_from_env() -> dict[str, Any] | None:
     """Build a remote-HTTP MCP server entry for Kaneo when env is configured.
 
@@ -130,6 +155,13 @@ def ensure_bot_runtime_mcp_config(
     kaneo_server = _kaneo_server_from_env()
     if kaneo_server is not None:
         servers["kaneo"] = kaneo_server
+
+    # Inject GitHub's hosted MCP server when a PAT is in env. Lets the
+    # bot's claude session create repos / open PRs / read code as part
+    # of the operator's natural-language intent in Telegram.
+    github_server = _github_server_from_env()
+    if github_server is not None:
+        servers["github"] = github_server
 
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     os.chmod(runtime_path.parent, _RUNTIME_DIR_MODE)

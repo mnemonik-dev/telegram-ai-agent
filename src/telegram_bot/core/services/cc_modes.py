@@ -64,13 +64,14 @@ _BOT_MCP_TOOLS = "mcp__bot__send_message,mcp__bot__send_image,mcp__bot__send_doc
 # the tools simply won't be available at session-start time, so leaving
 # this in every mode is safe for bots that haven't been paired.
 _KANEO_MCP_TOOLS = "mcp__kaneo"
-_COMMON = f"Skill,{_BOT_MCP_TOOLS},{_KANEO_MCP_TOOLS}"
+_GITHUB_MCP_TOOLS = "mcp__github"
+_COMMON = f"Skill,{_BOT_MCP_TOOLS},{_KANEO_MCP_TOOLS},{_GITHUB_MCP_TOOLS}"
 _RW = "Read,Write,Edit,Grep,Glob,Bash,Agent"
 
 TASK_MODE_TOOLS = f"{_COMMON},Read,Grep,Glob,Bash,Agent"
 KNOWLEDGE_MODE_TOOLS = f"{_COMMON},{_RW}"
 FREE_MODE_TOOLS = f"{_COMMON},{_RW}"
-PROJECT_MODE_TOOLS = f"{_BOT_MCP_TOOLS},{_KANEO_MCP_TOOLS},{_RW},Skill"
+PROJECT_MODE_TOOLS = f"{_BOT_MCP_TOOLS},{_KANEO_MCP_TOOLS},{_GITHUB_MCP_TOOLS},{_RW},Skill"
 BLOG_MODE_TOOLS = f"{_COMMON},{_RW}"
 
 _MODE_TOOLS: dict[str, str] = {
