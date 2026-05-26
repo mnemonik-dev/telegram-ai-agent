@@ -27,7 +27,7 @@ from telegram_bot.core.handlers.voice import router as voice_router
 from telegram_bot.core.keyboards import topic_keyboard
 from telegram_bot.core.messages import t
 from telegram_bot.core.middleware.auth import AuthMiddleware
-from telegram_bot.core.services.bot_commands import setup_bot_commands
+from telegram_bot.core.services.bot_commands import MOLYANOV_BOT_COMMANDS, setup_bot_commands
 from telegram_bot.core.services.claude import SessionManager
 from telegram_bot.core.services.dynamic_cwd import (
     MessageContext,
@@ -192,15 +192,14 @@ async def _start() -> None:
     settings = get_settings()
     bot = Bot(token=settings.telegram_bot_token)
     try:
-        # Molyanov slash-commands (/tech-spec-planning, /do-task, …) live
-        # in claude's skill bundle but CAN'T be advertised via Telegram's
-        # setMyCommands — Bot API only accepts /[a-z0-9_]+/ for command
-        # names, and the skills use hyphens. They still work for the
-        # operator: typing `/tech-spec-planning idea` falls through to
-        # claude (no aiogram handler matches), claude reads the slash
-        # prefix and invokes the skill via its Skill tool. The
-        # autocomplete just won't surface them.
-        await setup_bot_commands(bot)
+        # MOLYANOV_BOT_COMMANDS exposes the underscore-named Molyanov skills
+        # in Telegram's `/` autocomplete (e.g. /tech_spec_planning). The
+        # claude-skills bundle now ships both naming styles — underscore
+        # dir is the canonical name; hyphenated symlinks (tech-spec-planning
+        # → tech_spec_planning) keep prior references working. Telegram's
+        # Bot API rejects hyphens in command names (BOT_COMMAND_INVALID);
+        # this rename is what unblocks autocomplete discovery for operators.
+        await setup_bot_commands(bot, extra_commands=MOLYANOV_BOT_COMMANDS)
     except Exception:
         logger.warning("Failed to set Telegram bot commands", exc_info=True)
 

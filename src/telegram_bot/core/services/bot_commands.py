@@ -60,57 +60,57 @@ PUBLIC_BOT_COMMANDS: tuple[LocalizedBotCommand, ...] = (
 # text path); claude then invokes the matching skill via its Skill tool.
 MOLYANOV_BOT_COMMANDS: tuple[LocalizedBotCommand, ...] = (
     LocalizedBotCommand(
-        "user-spec-planning",
+        "user_spec_planning",
         "Создать user-spec фичи (Molyanov)",
         "Plan a feature's user-spec (Molyanov)",
     ),
     LocalizedBotCommand(
-        "tech-spec-planning",
+        "tech_spec_planning",
         "Создать tech-spec из user-spec",
         "Plan a tech-spec from a user-spec",
     ),
     LocalizedBotCommand(
-        "decompose-tech-spec",
+        "decompose_tech_spec",
         "Разбить tech-spec на задачи",
         "Decompose a tech-spec into tasks",
     ),
     LocalizedBotCommand(
-        "do-task",
+        "do_task",
         "Выполнить задачу из tasks/<NN>.md",
         "Execute a task from tasks/<NN>.md",
     ),
     LocalizedBotCommand(
-        "do-feature",
+        "do_feature",
         "Выполнить фичу командой агентов",
         "Execute a feature with an agent team",
     ),
     LocalizedBotCommand(
-        "write-code",
+        "write_code",
         "Написать код через TDD и ревью",
         "Write code with TDD and review",
     ),
     LocalizedBotCommand(
-        "code-reviewing",
+        "code_reviewing",
         "Провести ревью кода",
         "Review code",
     ),
     LocalizedBotCommand(
-        "test-master",
+        "test_master",
         "Стратегия тестирования / ревью тестов",
         "Testing strategy / test review",
     ),
     LocalizedBotCommand(
-        "security-auditor",
+        "security_auditor",
         "Аудит безопасности (OWASP)",
         "Security audit (OWASP)",
     ),
     LocalizedBotCommand(
-        "pre-deploy-qa",
+        "pre_deploy_qa",
         "Приёмочное тестирование перед деплоем",
         "Pre-deploy acceptance testing",
     ),
     LocalizedBotCommand(
-        "post-deploy-qa",
+        "post_deploy_qa",
         "Верификация после деплоя",
         "Post-deploy verification",
     ),
