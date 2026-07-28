@@ -47,6 +47,7 @@ from telegram_bot.core.services.topic_config import (
     _VALID_EXEC_MODES,
     _VALID_STREAM_MODES,
     TopicConfig,
+    normalize_thread_id,
 )
 from telegram_bot.core.services.topic_runtime import BotDefaults, resolve_topic_runtime_config
 from telegram_bot.core.types import ChannelKey, channel_key
@@ -286,10 +287,6 @@ async def handle_resume(
 ) -> None:
     """Open server-side picker with resumable Claude/Codex sessions."""
     key = channel_key(message)
-    if key[1] is None:
-        await message.answer(t("ui.resume_not_in_forum"))
-        return
-
     runtime = resolve_topic_runtime_config(topic_config.get_topic(key[1]), bot_defaults)
     entries = tuple(await asyncio.to_thread(list_sessions, runtime.cwd))
     if not entries:
@@ -531,11 +528,8 @@ async def on_resume_cancel(callback: CallbackQuery, picker_store: PickerStore) -
 
 @router.message(Command("stream"))
 async def handle_stream_mode(message: Message, topic_config: TopicConfig) -> None:
-    """Show a 3-button picker to switch stream_mode for the current topic."""
+    """Show a 3-button picker to switch stream_mode for the current chat."""
     _, thread_id = channel_key(message)
-    if thread_id is None:
-        await message.answer(t("ui.stream_mode_not_in_forum"))
-        return
     current = topic_config.get_topic(thread_id).stream_mode
     await message.answer(
         t("ui.stream_mode_picker_caption", current=current),
@@ -564,14 +558,10 @@ async def on_stream_mode_click(
         return
 
     thread_id = callback.message.message_thread_id
-    if thread_id is None:
-        await callback.answer(
-            t("ui.stream_mode_not_in_forum"),
-            show_alert=True,
-        )
-        return
-
-    ok = await topic_config.update_stream_mode(thread_id, mode)  # type: ignore[arg-type]
+    ok = await topic_config.update_stream_mode(
+        normalize_thread_id(thread_id),
+        mode,  # type: ignore[arg-type]
+    )
     if not ok:
         await callback.answer(t("ui.stream_mode_write_failed"), show_alert=True)
         return
@@ -590,11 +580,8 @@ async def on_stream_mode_click(
 
 @router.message(Command("mode"))
 async def handle_mode_command(message: Message, topic_config: TopicConfig) -> None:
-    """Show a 2-button picker to switch exec_mode for the current topic."""
+    """Show a 2-button picker to switch exec_mode for the current chat."""
     _, thread_id = channel_key(message)
-    if thread_id is None:
-        await message.answer(t("ui.exec_mode_not_in_forum"))
-        return
     current = topic_config.get_topic(thread_id).exec_mode
     await message.answer(
         _exec_mode_picker_caption(current),
@@ -634,10 +621,6 @@ async def on_exec_mode_click(
         return
 
     thread_id = callback.message.message_thread_id
-    if thread_id is None:
-        await callback.answer(t("ui.exec_mode_not_in_forum"), show_alert=True)
-        return
-
     key = (callback.message.chat.id, thread_id)
     previous_mode = topic_config.get_topic(thread_id).exec_mode
 
@@ -657,7 +640,7 @@ async def on_exec_mode_click(
     if previous_mode == "tmux" and new_mode == "subprocess":
         await tmux_manager.kill(key)
 
-    ok = await topic_config.update_exec_mode(thread_id, new_mode)
+    ok = await topic_config.update_exec_mode(normalize_thread_id(thread_id), new_mode)
     if not ok:
         await callback.answer(t("ui.exec_mode_write_failed"), show_alert=True)
         return
@@ -685,11 +668,12 @@ async def on_exec_mode_click(
 
 @router.message(Command("engine"))
 async def handle_engine_command(message: Message, topic_config: TopicConfig) -> None:
-    """Show provider engine picker for the current forum topic."""
+    """Show provider engine picker for the current chat.
+
+    Works in forum topics AND in the General chat / private chats —
+    thread_id=None resolves to GENERAL_TOPIC_KEY inside TopicConfig.
+    """
     _, thread_id = channel_key(message)
-    if thread_id is None:
-        await message.answer(t("ui.engine_not_in_forum"))
-        return
     settings = topic_config.get_topic(thread_id)
     await message.answer(
         t(
@@ -718,10 +702,9 @@ async def on_engine_click(
         return
 
     _, _, raw_value = callback.data.partition(":")
+    # thread_id is None in the General chat / private chats — that is a
+    # first-class target now (GENERAL_TOPIC_KEY), so no forum-only guard.
     thread_id = callback.message.message_thread_id
-    if thread_id is None:
-        await callback.answer(t("ui.engine_not_in_forum"), show_alert=True)
-        return
     key = (callback.message.chat.id, thread_id)
     current = topic_config.get_topic(thread_id)
 
@@ -738,7 +721,11 @@ async def on_engine_click(
         await callback.answer(t("ui.engine_already"))
         return
 
-    ok = await topic_config.update_engine_model(thread_id, new_engine, None)  # type: ignore[arg-type]
+    ok = await topic_config.update_engine_model(
+        normalize_thread_id(thread_id),
+        new_engine,  # type: ignore[arg-type]
+        None,
+    )
     if not ok:
         await callback.answer(t("ui.engine_write_failed"), show_alert=True)
         return

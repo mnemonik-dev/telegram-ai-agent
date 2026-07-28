@@ -16,10 +16,11 @@ from telegram_bot.core.handlers.streaming import (
 )
 from telegram_bot.core.messages import t
 from telegram_bot.core.services.claude import SessionManager
+from telegram_bot.core.services.command_registry import CommandRegistry
 from telegram_bot.core.services.message_queue import MessageQueue
 from telegram_bot.core.services.providers import engine_display_name
 from telegram_bot.core.services.tmux_manager import TmuxManager
-from telegram_bot.core.services.topic_config import TopicConfig
+from telegram_bot.core.services.topic_config import TopicConfig, normalize_thread_id
 from telegram_bot.core.tui.routing import route_slash_command
 from telegram_bot.core.types import channel_key
 
@@ -36,6 +37,7 @@ async def handle_text(
     message_queue: MessageQueue,
     tmux_manager: TmuxManager,
     topic_config: TopicConfig,
+    command_registry: CommandRegistry | None = None,
     inbox_reply_handler: Callable[[Message, MessageQueue], Awaitable[bool]] | None = None,
 ) -> None:
     # User's own messages are trusted — no sanitize_forwarded_content() needed here.
@@ -43,6 +45,13 @@ async def handle_text(
     text = unparse_entities(message.text, message.entities)
     if not text.strip():
         return
+
+    # Bridge Telegram's [a-z0-9_] command charset to the engine's canonical
+    # dash spellings: /do_task → /do-task before the text becomes a prompt.
+    # Bot-reserved commands never reach this handler (aiogram Command()
+    # filters route them first), so only engine-bound commands are rewritten.
+    if text.startswith("/") and command_registry is not None:
+        text = command_registry.canonicalize(text)
 
     key = channel_key(message)
     logger.info(
@@ -105,10 +114,8 @@ async def handle_text(
                 if tmux_manager.is_processing(key) or message_queue.is_busy(key):
                     await source_msg.answer(t("ui.exec_mode_busy"))
                     return
-                thread_id = key[1]
-                if thread_id is None:
-                    await source_msg.answer(t("ui.engine_not_in_forum"))
-                    return
+                # General chat (thread_id=None) persists under GENERAL_TOPIC_KEY.
+                thread_id = normalize_thread_id(key[1])
                 if exec_mode_changed and provider_changed:
                     assert target_exec_mode is not None
                     ok = await topic_config.update_engine_model_exec_mode(

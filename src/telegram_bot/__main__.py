@@ -18,6 +18,7 @@ from telegram_bot.core.handlers.commands import router as commands_router
 from telegram_bot.core.handlers.forum_topic import router as forum_topic_router
 from telegram_bot.core.handlers.forward import ForwardBatcher
 from telegram_bot.core.handlers.forward import router as forward_router
+from telegram_bot.core.handlers.gateway import router as gateway_router
 from telegram_bot.core.handlers.mode import router as mode_router
 from telegram_bot.core.handlers.photo import cleanup_old_tmp_files, ensure_tmp_dir
 from telegram_bot.core.handlers.photo import router as photo_router
@@ -27,14 +28,20 @@ from telegram_bot.core.handlers.voice import router as voice_router
 from telegram_bot.core.keyboards import topic_keyboard
 from telegram_bot.core.messages import t
 from telegram_bot.core.middleware.auth import AuthMiddleware
-from telegram_bot.core.services.bot_commands import MOLYANOV_BOT_COMMANDS, setup_bot_commands
+from telegram_bot.core.services.bot_commands import (
+    MOLYANOV_BOT_COMMANDS,
+    PUBLIC_BOT_COMMANDS,
+    setup_bot_commands,
+)
 from telegram_bot.core.services.claude import SessionManager
+from telegram_bot.core.services.command_registry import CommandRegistry
 from telegram_bot.core.services.dynamic_cwd import (
     MessageContext,
     check_dynamic_cwd_preconditions,
     dynamic_cwd_lease,
 )
 from telegram_bot.core.services.message_queue import MessageQueue
+from telegram_bot.core.services.picker_store import PickerStore
 from telegram_bot.core.services.tmux_manager import TmuxManager
 from telegram_bot.core.services.topic_config import TopicConfig
 from telegram_bot.core.services.topic_runtime import BotDefaults, resolve_topic_runtime_config
@@ -191,15 +198,24 @@ async def _start() -> None:
 
     settings = get_settings()
     bot = Bot(token=settings.telegram_bot_token)
+
+    # Discover engine slash commands from the engine HOME
+    # (~/.claude/{commands,skills}) and expose them in Telegram's `/`
+    # autocomplete with underscore-normalized names (Telegram's Bot API
+    # rejects hyphens — BOT_COMMAND_INVALID). Incoming underscore aliases
+    # are rewritten back to the canonical dash spelling in the text
+    # handler before they reach the engine. When discovery finds nothing
+    # (fresh VM, empty HOME), fall back to the static Molyanov list so the
+    # menu is never worse than before. Rescan at runtime: /sync_commands.
+    command_registry = CommandRegistry(Path.home())
     try:
-        # MOLYANOV_BOT_COMMANDS exposes the underscore-named Molyanov skills
-        # in Telegram's `/` autocomplete (e.g. /tech_spec_planning). The
-        # claude-skills bundle now ships both naming styles — underscore
-        # dir is the canonical name; hyphenated symlinks (tech-spec-planning
-        # → tech_spec_planning) keep prior references working. Telegram's
-        # Bot API rejects hyphens in command names (BOT_COMMAND_INVALID);
-        # this rename is what unblocks autocomplete discovery for operators.
-        await setup_bot_commands(bot, extra_commands=MOLYANOV_BOT_COMMANDS)
+        discovered = command_registry.scan()
+        extra_commands = (
+            command_registry.localized_commands(reserved_slots=len(PUBLIC_BOT_COMMANDS))
+            if discovered
+            else MOLYANOV_BOT_COMMANDS
+        )
+        await setup_bot_commands(bot, extra_commands=extra_commands)
     except Exception:
         logger.warning("Failed to set Telegram bot commands", exc_info=True)
 
@@ -278,6 +294,7 @@ async def _start() -> None:
     # any text/forward handler tries to read mode/cwd for the new thread.
     dp.include_router(forum_topic_router)
     dp.include_router(commands_router)
+    dp.include_router(gateway_router)
     dp.include_router(cancel_router)
     dp.include_router(mode_router)
     dp.include_router(forward_router)
@@ -293,6 +310,15 @@ async def _start() -> None:
     dp["settings"] = settings
     dp["topic_config"] = topic_config
     dp["tmux_manager"] = tmux_manager
+    dp["command_registry"] = command_registry
+    # /resume dependencies. These were never injected, so every /resume
+    # (and its picker callbacks) died in aiogram DI with a missing-argument
+    # error before reaching the handler body.
+    dp["picker_store"] = PickerStore()
+    dp["bot_defaults"] = BotDefaults(
+        cwd=session_manager.default_cwd(),
+        mcp_config=Path(session_manager.default_mcp_config_path()),
+    )
 
     ensure_tmp_dir(session_manager.file_cache_dir)
     cleanup_old_tmp_files(session_manager.file_cache_dir)

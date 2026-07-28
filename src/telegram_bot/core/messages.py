@@ -149,6 +149,43 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ui.resume_config_write_failed": "Failed to update engine; nothing changed",
         "ui.resume_cancelled": "Cancelled",
         "ui.error_generic": "An error occurred while processing the request. Try again.",
+        "ui.queue_item_failed": (
+            "❌ The engine failed on this message:\n{detail}\n\n"
+            "Send it again, or /relogin to reset the engine session."
+        ),
+        "ui.queue_auth_error": (
+            "🔐 The engine hit an auth/quota problem:\n{detail}\n\n"
+            "If credentials changed, update /etc/telegram-ai-agent/.env "
+            "(or run `sudo bot-claude-reset --oauth-token …` on the VM), "
+            "then send /relogin here. If the subscription window is "
+            "exhausted, wait for the reset or switch to a cheaper model."
+        ),
+        "ui.status_report": (
+            "ℹ️ Status for this chat\n"
+            "Engine: {engine} · model: {model}\n"
+            "exec_mode: {exec_mode} · stream: {stream_mode} · mode: {mode}\n"
+            "cwd: {cwd}\n"
+            "Config source: {source}\n"
+            "Session: {session} · queue busy: {busy}\n"
+            "Auth env: {auth}"
+        ),
+        "ui.status_source_override": "runtime override (topic_config.json)",
+        "ui.status_source_defaults": "defaults (no explicit entry)",
+        "ui.relogin_start": "♻️ Resetting the engine session and reloading credentials…",
+        "ui.relogin_env": "🔑 Reloaded {count} credential var(s) from .env",
+        "ui.relogin_ok": "✅ Relogin OK — {engine} responded:\n{reply}",
+        "ui.relogin_failed": (
+            "❌ Engine probe failed:\n{detail}\n\n"
+            "Fix credentials in /etc/telegram-ai-agent/.env (or run "
+            "`sudo bot-claude-reset --oauth-token …` on the VM), then retry /relogin."
+        ),
+        "ui.relogin_probe_skipped": (
+            "✅ Session reset. Probe skipped for engine {engine} — "
+            "send any message to verify."
+        ),
+        "ui.sync_commands_done": "🔄 Commands re-scanned: {count} registered.{dropped}",
+        "ui.sync_commands_dropped": "\nNot exposable in Telegram: {names}",
+        "ui.sync_commands_unavailable": "⚠️ Command registry is not initialized.",
         "ui.cc_not_found": "Claude Code not found. Make sure it is installed and on PATH.",
         "ui.agent_cli_not_found": (
             "I couldn't find Claude Code or Codex. Install at least one of them for the "
@@ -385,6 +422,43 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ui.resume_config_write_failed": "Не удалось обновить engine; ничего не изменено",
         "ui.resume_cancelled": "Отменено",
         "ui.error_generic": "Произошла ошибка при обработке запроса. Попробуй ещё раз.",
+        "ui.queue_item_failed": (
+            "❌ Движок упал на этом сообщении:\n{detail}\n\n"
+            "Отправь его ещё раз или сделай /relogin для сброса сессии движка."
+        ),
+        "ui.queue_auth_error": (
+            "🔐 Проблема авторизации/квоты движка:\n{detail}\n\n"
+            "Если менялись креды — обнови /etc/telegram-ai-agent/.env "
+            "(или запусти `sudo bot-claude-reset --oauth-token …` на VM), "
+            "затем отправь /relogin сюда. Если квота подписки исчерпана — "
+            "дождись сброса окна или переключись на более дешёвую модель."
+        ),
+        "ui.status_report": (
+            "ℹ️ Статус этого чата\n"
+            "Движок: {engine} · модель: {model}\n"
+            "exec_mode: {exec_mode} · stream: {stream_mode} · mode: {mode}\n"
+            "cwd: {cwd}\n"
+            "Источник конфига: {source}\n"
+            "Сессия: {session} · очередь занята: {busy}\n"
+            "Auth env: {auth}"
+        ),
+        "ui.status_source_override": "runtime-переопределение (topic_config.json)",
+        "ui.status_source_defaults": "дефолты (явной записи нет)",
+        "ui.relogin_start": "♻️ Сбрасываю сессию движка и перечитываю креды…",
+        "ui.relogin_env": "🔑 Перечитано переменных из .env: {count}",
+        "ui.relogin_ok": "✅ Relogin OK — {engine} ответил:\n{reply}",
+        "ui.relogin_failed": (
+            "❌ Проба движка не прошла:\n{detail}\n\n"
+            "Поправь креды в /etc/telegram-ai-agent/.env (или запусти "
+            "`sudo bot-claude-reset --oauth-token …` на VM) и повтори /relogin."
+        ),
+        "ui.relogin_probe_skipped": (
+            "✅ Сессия сброшена. Проба для движка {engine} пропущена — "
+            "отправь любое сообщение для проверки."
+        ),
+        "ui.sync_commands_done": "🔄 Команды пересканированы: {count} зарегистрировано.{dropped}",
+        "ui.sync_commands_dropped": "\nНе представимы в Telegram: {names}",
+        "ui.sync_commands_unavailable": "⚠️ Реестр команд не инициализирован.",
         "ui.cc_not_found": (
             "Claude Code не найден. Убедитесь, что он установлен и доступен в PATH."
         ),

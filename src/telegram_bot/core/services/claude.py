@@ -812,7 +812,7 @@ class SessionManager:
                 logger.warning("Codex output-last-message file empty or missing")
                 cleanup_output_last_message()
                 cleanup_runtime_mcp_config()
-                raise CCProcessError(process.returncode or -1)
+                raise CCProcessError(process.returncode or -1, stderr_text[-500:])
         cleanup_output_last_message()
         cleanup_runtime_mcp_config()
 
@@ -822,7 +822,7 @@ class SessionManager:
                 process.returncode,
                 stderr_text[-500:] or "(empty)",
             )
-            raise CCProcessError(process.returncode)
+            raise CCProcessError(process.returncode, stderr_text[-500:])
 
         # Don't update session_id from force-killed process output (may be stale)
         if force_killed:
@@ -1550,9 +1550,17 @@ class CCTimeoutError(Exception):
 
 
 class CCProcessError(Exception):
-    def __init__(self, exit_code: int) -> None:
+    def __init__(self, exit_code: int, stderr_tail: str = "") -> None:
         self.exit_code = exit_code
-        super().__init__(f"CC process exited with code {exit_code}")
+        # Tail of the engine's stderr — the only place auth/quota failures
+        # ("invalid api key", "credit balance", rate limits) are visible.
+        # Carried on the exception so the queue can tell the operator WHY
+        # the engine died instead of dropping the item silently.
+        self.stderr_tail = stderr_tail
+        message = f"CC process exited with code {exit_code}"
+        if stderr_tail.strip():
+            message = f"{message}: {stderr_tail.strip()}"
+        super().__init__(message)
 
 
 class CCInactivityError(Exception):

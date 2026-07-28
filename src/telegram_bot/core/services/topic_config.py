@@ -47,6 +47,21 @@ _CORE_PROMPT_MODES: set[str] = {"task", "knowledge", "free", "project", "blog"}
 DYNAMIC_CWD_SENTINEL = "DYNAMIC"
 """Sentinel cwd value; path resolved at engine-spawn time via an external HTTP resolver."""
 
+GENERAL_TOPIC_KEY = 0
+"""topic_config.json key for the forum's General chat (and private chats).
+
+Telegram gives real forum topics thread_id >= 1 and reports the General
+chat as message_thread_id=None. Storing General-chat settings under the
+reserved key 0 makes it a first-class config target: /engine, /mode,
+/stream and model overrides work outside forum topics instead of being
+rejected with "works only in forum topics".
+"""
+
+
+def normalize_thread_id(thread_id: int | None) -> int:
+    """Map a Telegram message_thread_id to its topic_config.json key."""
+    return GENERAL_TOPIC_KEY if thread_id is None else thread_id
+
 _valid_modes_cache: tuple[int, set[str]] = (-1, set())
 
 
@@ -312,11 +327,19 @@ class TopicConfig:
         self._routing = routing
 
     def get_topic(self, thread_id: int | None) -> TopicSettings:
-        """Return settings for a thread_id. Unknown/None returns defaults."""
+        """Return settings for a thread_id. Unknown returns defaults.
+
+        None (General chat / private chat) resolves to GENERAL_TOPIC_KEY so
+        runtime overrides written by /engine, /mode, /stream outside forum
+        topics are honored on the read path too.
+        """
         self._maybe_reload()
-        if thread_id is None:
-            return _default_topic()
-        return self._topics.get(thread_id, _default_topic())
+        return self._topics.get(normalize_thread_id(thread_id), _default_topic())
+
+    def has_topic(self, thread_id: int | None) -> bool:
+        """True when topic_config.json has an explicit entry for this chat."""
+        self._maybe_reload()
+        return normalize_thread_id(thread_id) in self._topics
 
     def get_routing(self, notification_type: str) -> int | None:
         """Return thread_id for a notification type, or None if not configured."""

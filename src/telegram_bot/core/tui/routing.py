@@ -27,6 +27,9 @@ BOT_RESERVED_COMMANDS = frozenset(
         "/language",
         "/day",
         "/tui",
+        "/status",
+        "/relogin",
+        "/sync_commands",
     }
 )
 

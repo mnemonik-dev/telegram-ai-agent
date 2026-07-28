@@ -40,6 +40,21 @@ PUBLIC_BOT_COMMANDS: tuple[LocalizedBotCommand, ...] = (
     LocalizedBotCommand("mode", "Выбрать режим выполнения", "Choose execution mode"),
     LocalizedBotCommand("stream", "Выбрать режим ответов", "Choose response mode"),
     LocalizedBotCommand("engine", "Выбрать Claude Code или Codex", "Choose Claude Code or Codex"),
+    LocalizedBotCommand(
+        "status",
+        "Движок/модель/авторизация чата",
+        "Chat engine/model/auth status",
+    ),
+    LocalizedBotCommand(
+        "relogin",
+        "Сбросить сессию и перечитать креды",
+        "Reset session and reload credentials",
+    ),
+    LocalizedBotCommand(
+        "sync_commands",
+        "Пересканировать команды движка",
+        "Rescan engine commands",
+    ),
     LocalizedBotCommand("resume", "Возобновить сохраненную сессию", "Resume a saved session"),
     LocalizedBotCommand("kill", "Остановить tmux-сессию", "Stop the tmux session"),
     LocalizedBotCommand("tui", "Открыть панель TUI", "Open the TUI panel"),

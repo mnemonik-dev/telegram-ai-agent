@@ -44,6 +44,35 @@ ProcessCallback = Callable[
 ]
 
 
+# Substrings (lowercased) in an engine failure that indicate an auth or
+# quota problem rather than a transient crash. Sourced from claude CLI /
+# Anthropic API error texts observed in production (invalid x-api-key,
+# credit balance too low, rate limits, revoked OAuth).
+_AUTH_ERROR_MARKERS = (
+    "invalid api key",
+    "invalid x-api-key",
+    "authentication",
+    "unauthorized",
+    "credit balance",
+    "quota",
+    "rate limit",
+    "rate_limit",
+    "oauth",
+    "usage limit",
+    "please run /login",
+)
+
+
+def _failure_notification_text(exc: Exception) -> str:
+    """Build the user-facing text for a dropped queue item."""
+    detail = str(exc)
+    lowered = detail.lower()
+    snippet = detail[-300:] if detail else type(exc).__name__
+    if any(marker in lowered for marker in _AUTH_ERROR_MARKERS):
+        return t("ui.queue_auth_error", detail=snippet)
+    return t("ui.queue_item_failed", detail=snippet)
+
+
 def _combine_prompts(entries: list[tuple[int, str]]) -> str:
     """Combine prompt entries into a single prompt string.
 
@@ -254,7 +283,7 @@ class MessageQueue:
                         item.target_session_id,
                     )
                     queue.error_count = 0
-                except Exception:
+                except Exception as exc:
                     # Drop semantics: the item was already popped above and is
                     # not re-enqueued. The backoff throttles the NEXT item so
                     # consecutive failures don't storm downstream; it is not a
@@ -268,6 +297,14 @@ class MessageQueue:
                         queue.error_count,
                         backoff_sec,
                         exc_info=True,
+                    )
+                    # Silence here used to be the operator's whole quota-day
+                    # experience: the engine died with an auth/credit error
+                    # and the chat showed "Thinking..." forever. Always tell
+                    # the chat the item failed, with the auth-specific hint
+                    # when the failure smells like credentials/quota.
+                    await self._send_notification(
+                        channel_key, _failure_notification_text(exc)
                     )
                     await asyncio.sleep(backoff_sec)
 

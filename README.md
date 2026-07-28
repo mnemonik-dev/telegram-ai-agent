@@ -445,16 +445,39 @@ still exists as a legacy alias, but `/clear` is the command shown in the menu.
 - `/clear`: reset the current topic session.
 - `/cancel`: cancel current processing.
 - `/language`: show or switch UI language, for example `/language ru`.
-- `/mode`: forum topics only; choose `tmux` or `subprocess`. Switching from
-  `tmux` to `subprocess` stops the active tmux session.
-- `/engine`: forum topics only; choose Claude Code or Codex. Changing engine
-  resets the active session.
-- `/stream`: forum topics only; choose `verbose`, `live`, or `minimal`.
-- `/resume`: forum topics only; resume a saved tmux session for the current
-  topic working directory.
+- `/mode`: choose `tmux` or `subprocess`. Switching from `tmux` to
+  `subprocess` stops the active tmux session.
+- `/engine`: choose Claude Code or Codex. Changing engine resets the active
+  session.
+- `/stream`: choose `verbose`, `live`, or `minimal`.
+- `/resume`: resume a saved session for the current working directory.
+- `/status`: effective engine/model/exec/stream config for the current chat,
+  its source (runtime override vs defaults), and which auth env vars are set.
+- `/relogin`: reset the engine session, re-read credential env vars
+  (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) from the
+  project `.env`, and probe the engine. Use after quota exhaustion or a token
+  rotation — no service restart needed. Token values are never accepted via
+  chat.
+- `/sync_commands`: rescan `$HOME/.claude/{commands,skills}` and re-register
+  the Telegram command menu without restarting the bot.
 - `/tui`: show and control the live tmux TUI.
 - `/tail`: legacy alias for `/tui`.
 - `/kill`: stop the active tmux session and free resources.
+
+`/mode`, `/engine`, `/stream`, `/resume`, and model overrides work in forum
+topics AND in the forum's General chat / private chats — General-chat
+settings persist under the reserved key `0` in `topic_config.json`.
+
+### Slash-command gateway
+
+At startup (and on `/sync_commands`) the bot scans the engine HOME's
+`~/.claude/commands/*.md` and `~/.claude/skills/*/SKILL.md`, and registers
+every discovered command in Telegram's `/` autocomplete. Telegram only
+allows `[a-z0-9_]` in command names, so dash-named commands are exposed
+under underscore aliases (`/do-task` -> `/do_task`) and rewritten back to
+the canonical dash spelling before reaching the engine — one command file
+per command is enough, and either spelling works. Commands beyond
+Telegram's 100-command cap are reported in `/sync_commands` output.
 
 Recommended defaults:
 
