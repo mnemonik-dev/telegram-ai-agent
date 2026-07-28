@@ -183,6 +183,24 @@ MESSAGES: dict[str, dict[str, str]] = {
             "✅ Session reset. Probe skipped for engine {engine} — "
             "send any message to verify."
         ),
+        "ui.model_current": (
+            "Model override for this chat: {model}\n"
+            "Set: /model sonnet (or opus, haiku, a full model id). "
+            "Clear: /model reset. Applies from the next message; "
+            "/clear first for a clean session."
+        ),
+        "ui.model_set": (
+            "✅ Model for this chat: {model}. Applies from the next message "
+            "(/clear for a clean session)."
+        ),
+        "ui.model_reset": "✅ Model override cleared — engine default applies.",
+        "ui.model_invalid": (
+            "⚠️ Invalid model name: {model}\n"
+            "Allowed: letters, digits, . _ : - (e.g. sonnet, opus, "
+            "claude-sonnet-4-5). Bracketed 1M-context variants are "
+            "intentionally rejected — they require paid usage credits."
+        ),
+        "ui.model_write_failed": "Failed to persist the model override, try again",
         "ui.sync_commands_done": "🔄 Commands re-scanned: {count} registered.{dropped}",
         "ui.sync_commands_dropped": "\nNot exposable in Telegram: {names}",
         "ui.sync_commands_unavailable": "⚠️ Command registry is not initialized.",
@@ -456,6 +474,24 @@ MESSAGES: dict[str, dict[str, str]] = {
             "✅ Сессия сброшена. Проба для движка {engine} пропущена — "
             "отправь любое сообщение для проверки."
         ),
+        "ui.model_current": (
+            "Переопределение модели для этого чата: {model}\n"
+            "Задать: /model sonnet (или opus, haiku, полный id модели). "
+            "Сбросить: /model reset. Применяется со следующего сообщения; "
+            "сначала /clear для чистой сессии."
+        ),
+        "ui.model_set": (
+            "✅ Модель для этого чата: {model}. Применяется со следующего "
+            "сообщения (/clear для чистой сессии)."
+        ),
+        "ui.model_reset": "✅ Переопределение модели снято — действует дефолт движка.",
+        "ui.model_invalid": (
+            "⚠️ Некорректное имя модели: {model}\n"
+            "Допустимы буквы, цифры, . _ : - (например sonnet, opus, "
+            "claude-sonnet-4-5). Варианты с [1m] отклоняются намеренно — "
+            "1M-контекст требует платных usage credits."
+        ),
+        "ui.model_write_failed": "Не удалось сохранить модель, попробуй ещё раз",
         "ui.sync_commands_done": "🔄 Команды пересканированы: {count} зарегистрировано.{dropped}",
         "ui.sync_commands_dropped": "\nНе представимы в Telegram: {names}",
         "ui.sync_commands_unavailable": "⚠️ Реестр команд не инициализирован.",

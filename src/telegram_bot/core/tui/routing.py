@@ -30,6 +30,10 @@ BOT_RESERVED_COMMANDS = frozenset(
         "/status",
         "/relogin",
         "/sync_commands",
+        # /model became a bot-persisted per-chat override (gateway.py). In
+        # tmux mode it no longer forwards to the TUI pane — the persisted
+        # override applies when the next session starts.
+        "/model",
     }
 )
 

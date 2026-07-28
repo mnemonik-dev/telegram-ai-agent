@@ -46,6 +46,11 @@ PUBLIC_BOT_COMMANDS: tuple[LocalizedBotCommand, ...] = (
         "Chat engine/model/auth status",
     ),
     LocalizedBotCommand(
+        "model",
+        "Задать модель для этого чата",
+        "Set the model for this chat",
+    ),
+    LocalizedBotCommand(
         "relogin",
         "Сбросить сессию и перечитать креды",
         "Reset session and reload credentials",

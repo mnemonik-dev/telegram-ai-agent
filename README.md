@@ -453,6 +453,9 @@ still exists as a legacy alias, but `/clear` is the command shown in the menu.
 - `/resume`: resume a saved session for the current working directory.
 - `/status`: effective engine/model/exec/stream config for the current chat,
   its source (runtime override vs defaults), and which auth env vars are set.
+- `/model`: show or set a per-chat model override (`/model sonnet`,
+  `/model reset`). Use it to escape a costly engine default — e.g. a
+  1M-context variant that requires paid usage credits.
 - `/relogin`: reset the engine session, re-read credential env vars
   (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) from the
   project `.env`, and probe the engine. Use after quota exhaustion or a token

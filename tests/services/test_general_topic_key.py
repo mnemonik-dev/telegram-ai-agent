@@ -55,6 +55,22 @@ def test_engine_write_under_general_key_roundtrips(tmp_path) -> None:
     assert config.has_topic(None)
 
 
+def test_model_override_roundtrip_under_general_key(tmp_path) -> None:
+    config_path = tmp_path / "topic_config.json"
+    config = TopicConfig(str(config_path), ".")
+
+    assert asyncio.run(config.update_model(normalize_thread_id(None), "sonnet"))
+    assert config.get_topic(None).model == "sonnet"
+
+    # Bracketed 1M-context variants are rejected by the model validator —
+    # they require paid usage credits (the exact failure /model exists to fix).
+    assert not asyncio.run(config.update_model(normalize_thread_id(None), "sonnet[1m]"))
+    assert config.get_topic(None).model == "sonnet"
+
+    assert asyncio.run(config.update_model(normalize_thread_id(None), None))
+    assert config.get_topic(None).model is None
+
+
 def test_general_and_forum_entries_are_independent(tmp_path) -> None:
     config_path = tmp_path / "topic_config.json"
     config = TopicConfig(str(config_path), ".")

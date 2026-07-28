@@ -31,7 +31,7 @@ from telegram_bot.core.services.bot_commands import PUBLIC_BOT_COMMANDS, setup_b
 from telegram_bot.core.services.claude import SessionManager
 from telegram_bot.core.services.command_registry import CommandRegistry
 from telegram_bot.core.services.message_queue import MessageQueue
-from telegram_bot.core.services.topic_config import TopicConfig
+from telegram_bot.core.services.topic_config import TopicConfig, normalize_thread_id
 from telegram_bot.core.types import channel_key
 
 logger = logging.getLogger(__name__)
@@ -144,6 +144,43 @@ async def _probe_claude(cwd: Path) -> tuple[bool, str]:
         return True, out[-300:]
     detail = (err or out or f"exit code {process.returncode}")[-500:]
     return False, detail
+
+
+@router.message(Command("model"))
+async def handle_model(
+    message: Message,
+    topic_config: TopicConfig,
+) -> None:
+    """Show or persist a per-chat model override.
+
+    `/model` shows the current override; `/model sonnet` persists one;
+    `/model reset` returns to the engine default. Works in forum topics
+    and the General chat alike. The override is read at engine spawn, so
+    it applies from the next message (send /clear first for a clean
+    session). Bracketed variants like `sonnet[1m]` are rejected by the
+    model validator — the 1M-context beta requires paid usage credits
+    and is exactly what an operator uses /model to escape.
+    """
+    key = channel_key(message)
+    parts = (message.text or "").split(maxsplit=1)
+    arg = parts[1].strip() if len(parts) > 1 else ""
+
+    if not arg:
+        current = topic_config.get_topic(key[1]).model
+        await message.answer(t("ui.model_current", model=current or "(engine default)"))
+        return
+
+    if arg.lower() in {"reset", "default", "none"}:
+        if await topic_config.update_model(normalize_thread_id(key[1]), None):
+            await message.answer(t("ui.model_reset"))
+        else:
+            await message.answer(t("ui.model_write_failed"))
+        return
+
+    if not await topic_config.update_model(normalize_thread_id(key[1]), arg):
+        await message.answer(t("ui.model_invalid", model=arg))
+        return
+    await message.answer(t("ui.model_set", model=arg))
 
 
 @router.message(Command("relogin"))
