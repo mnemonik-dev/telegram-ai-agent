@@ -65,6 +65,11 @@ PUBLIC_BOT_COMMANDS: tuple[LocalizedBotCommand, ...] = (
         "Режим общего чата: direct/mention",
         "Shared-chat mode: direct/mention",
     ),
+    LocalizedBotCommand(
+        "route",
+        "Движок/модель стадий Symphony (оператор)",
+        "Symphony stage engine/model (operator)",
+    ),
     LocalizedBotCommand("whoami", "Мой id и роль", "My id and role"),
     LocalizedBotCommand("invite", "Пригласить пользователя (оператор)", "Invite a user (operator)"),
     LocalizedBotCommand("grant", "Выдать роль (оператор)", "Grant a role (operator)"),

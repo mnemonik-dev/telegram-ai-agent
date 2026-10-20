@@ -23,6 +23,7 @@ from telegram_bot.core.handlers.gateway import router as gateway_router
 from telegram_bot.core.handlers.mode import router as mode_router
 from telegram_bot.core.handlers.photo import cleanup_old_tmp_files, ensure_tmp_dir
 from telegram_bot.core.handlers.photo import router as photo_router
+from telegram_bot.core.handlers.route import router as route_router
 from telegram_bot.core.handlers.streaming import send_streaming_response
 from telegram_bot.core.handlers.text import router as text_router
 from telegram_bot.core.handlers.users import router as users_router
@@ -309,6 +310,7 @@ async def _start() -> None:
     # any text/forward handler tries to read mode/cwd for the new thread.
     dp.include_router(forum_topic_router)
     dp.include_router(users_router)
+    dp.include_router(route_router)
     dp.include_router(chat_mode_router)
     dp.include_router(commands_router)
     dp.include_router(gateway_router)
