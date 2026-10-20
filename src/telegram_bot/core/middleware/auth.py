@@ -17,7 +17,9 @@ from telegram_bot.core.services.user_store import ROLES, UserStore
 logger = logging.getLogger(__name__)
 
 # Commands only operators may run. Members keep everything else.
-OPERATOR_COMMANDS = frozenset({"invite", "grant", "revoke", "users", "relogin", "sync_commands"})
+OPERATOR_COMMANDS = frozenset(
+    {"invite", "grant", "revoke", "users", "route", "relogin", "sync_commands"}
+)
 # The only commands a read-only viewer may run.
 VIEWER_COMMANDS = frozenset({"whoami", "help", "start"})
 

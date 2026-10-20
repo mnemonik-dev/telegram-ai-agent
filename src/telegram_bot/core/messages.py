@@ -67,6 +67,17 @@ MESSAGES: dict[str, dict[str, str]] = {
             "This topic runs {engine} right now. "
             "Use /engine to switch before tagging the other one."
         ),
+        # --- UI: Symphony routing (/route) --------------------------------
+        "ui.route_header": "<b>Stage routing</b> (overrides workflow defaults):",
+        "ui.route_empty": "No overrides — every stage uses its workflow file.",
+        "ui.route_engines": "Engines: {engines}",
+        "ui.route_usage": (
+            "Usage: <code>/route</code> (show), <code>/route stage engine name</code>, "
+            "<code>/route stage model id</code>, <code>/route stage reset</code>."
+        ),
+        "ui.route_no_symphony": "Symphony URL is not configured for this bot.",
+        "ui.route_unreachable": "❌ Couldn't reach Symphony.",
+        "ui.route_rejected": "❌ Rejected: {detail}",
         "ui.thinking": "⏳ Thinking...",
         "ui.recognizing_voice": "⏳ Transcribing voice...",
         "ui.processing_forwards": "⏳ Processing forwarded messages...",
@@ -397,6 +408,17 @@ MESSAGES: dict[str, dict[str, str]] = {
             "Сейчас в этой теме работает {engine}. "
             "Переключи движок через /engine, прежде чем звать другой."
         ),
+        # --- UI: маршрутизация Symphony (/route) --------------------------
+        "ui.route_header": "<b>Маршрутизация стадий</b> (поверх настроек workflow):",
+        "ui.route_empty": "Переопределений нет — стадии работают по своим workflow-файлам.",
+        "ui.route_engines": "Движки: {engines}",
+        "ui.route_usage": (
+            "Использование: <code>/route</code> (показать), <code>/route стадия engine имя</code>, "
+            "<code>/route стадия model id</code>, <code>/route стадия reset</code>."
+        ),
+        "ui.route_no_symphony": "Для этого бота не задан адрес Symphony.",
+        "ui.route_unreachable": "❌ Не удалось связаться с Symphony.",
+        "ui.route_rejected": "❌ Отклонено: {detail}",
         "ui.thinking": "⏳ Думаю...",
         "ui.recognizing_voice": "⏳ Распознаю голосовое...",
         "ui.processing_forwards": "⏳ Обрабатываю пересланные сообщения...",

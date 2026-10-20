@@ -589,6 +589,10 @@ Operator commands:
   people the bot has already seen write in (or join) a chat it is in; for
   anyone else use `/invite`.
 - `/revoke @username|id` and `/users`.
+- `/route` — operators view and change which engine/model each Symphony stage
+  uses (`/route code model sonnet`, `/route code engine kimi`, `/route code
+  reset`). Needs `TELEGRAM_AI_AGENT_CWD_RESOLVER_URL` to point at Symphony; changes
+  apply to the next dispatch, no redeploy.
 
 Anyone can run `/whoami`. Unknown users are ignored, except that a stranger may
 redeem an invite link in a private chat.
