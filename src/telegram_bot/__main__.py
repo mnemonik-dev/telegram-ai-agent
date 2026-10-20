@@ -24,6 +24,7 @@ from telegram_bot.core.handlers.photo import cleanup_old_tmp_files, ensure_tmp_d
 from telegram_bot.core.handlers.photo import router as photo_router
 from telegram_bot.core.handlers.streaming import send_streaming_response
 from telegram_bot.core.handlers.text import router as text_router
+from telegram_bot.core.handlers.users import router as users_router
 from telegram_bot.core.handlers.voice import router as voice_router
 from telegram_bot.core.keyboards import topic_keyboard
 from telegram_bot.core.messages import t
@@ -46,6 +47,7 @@ from telegram_bot.core.services.tmux_manager import TmuxManager
 from telegram_bot.core.services.topic_config import TopicConfig
 from telegram_bot.core.services.topic_runtime import BotDefaults, resolve_topic_runtime_config
 from telegram_bot.core.services.transcriber import Transcriber
+from telegram_bot.core.services.user_store import UserStore
 from telegram_bot.core.services.workspace_resolver import (
     WorkspaceCapacityError,
     WorkspaceConfigError,
@@ -283,7 +285,15 @@ async def _start() -> None:
     message_queue = MessageQueue(bot, session_manager, _process_queue_item)
 
     dp = Dispatcher()
-    auth = AuthMiddleware(allowed_user_ids=settings.allowed_user_ids)
+    users_path = Path(settings.users_file)
+    if not users_path.is_absolute():
+        users_path = Path(settings.project_root) / users_path
+    user_store = UserStore(
+        users_path,
+        settings.allowed_user_ids,
+        invite_ttl_hours=settings.invite_ttl_hours,
+    )
+    auth = AuthMiddleware(user_store)
     dp.message.outer_middleware(auth)
     dp.callback_query.outer_middleware(auth)
     dp.message.filter(F.chat.type.in_({ChatType.PRIVATE, ChatType.SUPERGROUP}))
@@ -293,6 +303,7 @@ async def _start() -> None:
     # forum_topic_router runs first so topic_config.json is updated BEFORE
     # any text/forward handler tries to read mode/cwd for the new thread.
     dp.include_router(forum_topic_router)
+    dp.include_router(users_router)
     dp.include_router(commands_router)
     dp.include_router(gateway_router)
     dp.include_router(cancel_router)
@@ -308,6 +319,7 @@ async def _start() -> None:
     dp["message_queue"] = message_queue
     dp["queue"] = message_queue
     dp["settings"] = settings
+    dp["user_store"] = user_store
     dp["topic_config"] = topic_config
     dp["tmux_manager"] = tmux_manager
     dp["command_registry"] = command_registry

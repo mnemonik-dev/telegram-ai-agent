@@ -27,6 +27,33 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ui.start_welcome": (
             "Hi! I'll forward your messages to Claude Code. Just send me anything."
         ),
+        # --- UI: user roles / invites -----------------------------------
+        "ui.users_operators_only": "⛔ This command is for operators only.",
+        "ui.users_viewer_readonly": "👁 Your role is viewer (read-only).",
+        "ui.users_bad_role": "Unknown role. Use one of: {roles}.",
+        "ui.users_bootstrap": (
+            "ℹ️ {who} is an operator set in the bot configuration; change it there."
+        ),
+        "ui.users_header": "<b>Users</b> ({count}):",
+        "ui.whoami": "You: id <code>{id}</code>, role <b>{role}</b>.",
+        "ui.invite_created": (
+            "Invite for role <b>{role}</b> (single use, valid {hours}h):\n{link}"
+        ),
+        "ui.invite_invalid": "❌ This invite is invalid, expired or already used.",
+        "ui.invite_redeemed": "✅ Welcome! You now have the <b>{role}</b> role.",
+        "ui.invite_joined_notice": "✅ {who} joined as <b>{role}</b> via your invite.",
+        "ui.grant_usage": (
+            "Usage: <code>/grant @username role</code>, <code>/grant id role</code>, "
+            "or reply to their message with <code>/grant role</code>.\nRoles: {roles}"
+        ),
+        "ui.grant_ok": "✅ {who} is now <b>{role}</b>.",
+        "ui.grant_unknown_user": (
+            "I haven't seen {who} yet. Ask them to write in the chat once, "
+            "or send them an /invite link."
+        ),
+        "ui.revoke_usage": "Usage: /revoke @username | id, or reply to their message.",
+        "ui.revoke_ok": "✅ Access for {who} revoked.",
+        "ui.revoke_none": "{who} has no runtime role.",
         "ui.thinking": "⏳ Thinking...",
         "ui.recognizing_voice": "⏳ Transcribing voice...",
         "ui.processing_forwards": "⏳ Processing forwarded messages...",
@@ -316,6 +343,32 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ui.start_welcome": (
             "Привет! Я перешлю твои сообщения в Claude Code. Просто отправь мне сообщение."
         ),
+        # --- UI: роли / приглашения --------------------------------------
+        "ui.users_operators_only": "⛔ Команда доступна только операторам.",
+        "ui.users_viewer_readonly": "👁 Твоя роль — viewer (только чтение).",
+        "ui.users_bad_role": "Неизвестная роль. Доступны: {roles}.",
+        "ui.users_bootstrap": ("ℹ️ {who} — оператор из конфигурации бота; меняется только там."),
+        "ui.users_header": "<b>Пользователи</b> ({count}):",
+        "ui.whoami": "Ты: id <code>{id}</code>, роль <b>{role}</b>.",
+        "ui.invite_created": (
+            "Приглашение с ролью <b>{role}</b> (одноразовое, действует {hours} ч):\n{link}"
+        ),
+        "ui.invite_invalid": "❌ Приглашение недействительно, просрочено или уже использовано.",
+        "ui.invite_redeemed": "✅ Добро пожаловать! Твоя роль — <b>{role}</b>.",
+        "ui.invite_joined_notice": (
+            "✅ {who} присоединился как <b>{role}</b> по твоему приглашению."
+        ),
+        "ui.grant_usage": (
+            "Использование: <code>/grant @username роль</code>, <code>/grant id роль</code> "
+            "или ответ на сообщение: <code>/grant роль</code>.\nРоли: {roles}"
+        ),
+        "ui.grant_ok": "✅ {who} теперь <b>{role}</b>.",
+        "ui.grant_unknown_user": (
+            "Я ещё не видел {who}. Пусть напишет в чат или отправь ему ссылку /invite."
+        ),
+        "ui.revoke_usage": "Использование: /revoke @username | id или ответ на сообщение.",
+        "ui.revoke_ok": "✅ Доступ для {who} отозван.",
+        "ui.revoke_none": "У {who} нет роли в рантайме.",
         "ui.thinking": "⏳ Думаю...",
         "ui.recognizing_voice": "⏳ Распознаю голосовое...",
         "ui.processing_forwards": "⏳ Обрабатываю пересланные сообщения...",

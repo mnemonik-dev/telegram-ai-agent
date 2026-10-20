@@ -149,7 +149,11 @@ CC_INACTIVITY_KILL_SEC=1800
 Notes:
 
 - `TELEGRAM_BOT_TOKEN`: create a bot in `@BotFather`.
-- `ALLOWED_USER_IDS`: JSON array of Telegram user IDs allowed to use the bot.
+- `ALLOWED_USER_IDS`: JSON array of Telegram user IDs that are always operators
+  (bootstrap operators). Other users are managed at runtime, see
+  [Users and roles](#users-and-roles).
+- `USERS_FILE` (default `./users.json`): runtime users, roles and invites.
+- `INVITE_TTL_HOURS` (default `48`): lifetime of an `/invite` link.
 - `BOT_LANG`: `en` or `ru`. Restart the bot after changing it.
 - `DEFAULT_CWD`: default working directory for unconfigured topics.
 - `DEEPGRAM_API_KEY`: leave empty if you do not need voice messages.
@@ -567,6 +571,27 @@ Do not commit runtime files:
 
 Commit only public-safe examples and docs, such as `.env.example`,
 `topic_config.example.json`, and README files.
+
+## Users and roles
+
+Roles: `operator` (everything, plus user management), `member` (talks to the
+engine in chats and topics; cannot run `/relogin`, `/sync_commands` or the
+user commands) and `viewer` (read-only: `/whoami`, `/help`, `/start`). Users in
+`ALLOWED_USER_IDS` are operators and cannot be changed at runtime; everyone else
+is edited live — no restart or redeploy.
+
+Operator commands:
+
+- `/invite [role]` — one-time deep link (default role `member`). The invitee
+  opens it and gets the role; the code is stored only as a hash.
+- `/grant @username|id role`, or reply to someone's message with
+  `/grant role`. The Bot API cannot look up an `@username`, so this works for
+  people the bot has already seen write in (or join) a chat it is in; for
+  anyone else use `/invite`.
+- `/revoke @username|id` and `/users`.
+
+Anyone can run `/whoami`. Unknown users are ignored, except that a stranger may
+redeem an invite link in a private chat.
 
 ## Security Model
 
