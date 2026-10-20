@@ -39,6 +39,7 @@ async def handle_text(
     topic_config: TopicConfig,
     command_registry: CommandRegistry | None = None,
     inbox_reply_handler: Callable[[Message, MessageQueue], Awaitable[bool]] | None = None,
+    chat_context: str | None = None,
 ) -> None:
     # User's own messages are trusted — no sanitize_forwarded_content() needed here.
     # If multi-user access is added, apply sanitization like in forward.py.
@@ -52,6 +53,11 @@ async def handle_text(
     # filters route them first), so only engine-bound commands are rewritten.
     if text.startswith("/") and command_registry is not None:
         text = command_registry.canonicalize(text)
+
+    # Shared chat in `mention` mode: ChatModeMiddleware supplies the missed
+    # messages plus "<sender>: " so the engine knows who is speaking.
+    if chat_context:
+        text = chat_context + text
 
     key = channel_key(message)
     logger.info(

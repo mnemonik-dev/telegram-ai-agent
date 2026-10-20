@@ -593,6 +593,27 @@ Operator commands:
 Anyone can run `/whoami`. Unknown users are ignored, except that a stranger may
 redeem an invite link in a private chat.
 
+## Shared chats: talking with the agent
+
+By default (`/chat direct`) every message from an allowed user goes to the
+engine. In a group with several people, switch a topic to `/chat mention`:
+
+- The engine answers only when addressed: `@<bot username>`, a reply to one of
+  its messages, or a tag naming the topic's engine (`@claude` / `@codex`).
+- Everything else said in the topic is kept (last 30 messages, in memory) and
+  delivered with the next addressed message, attributed by sender, so the agent
+  can follow the conversation and answer in context. The agent's own session
+  history continues as usual.
+- Tagging the *other* engine does not switch engines; the bot points to
+  `/engine` instead.
+- Slash commands always work. Photos, voice notes and forwards are only
+  processed when addressed (caption mention or reply to the bot). The backlog is
+  lost on restart, and only text is attributed.
+- The setting is stored per topic as `chat_mode` in `topic_config.json`.
+  Applies to supergroups; private chats are always direct.
+- For the bot to see non-command messages in a group it must be a group admin
+  or have privacy mode disabled in @BotFather.
+
 ## Security Model
 
 This bot is for trusted personal or small-team use. `ALLOWED_USER_IDS` is the

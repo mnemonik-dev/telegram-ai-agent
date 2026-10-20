@@ -54,6 +54,19 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ui.revoke_usage": "Usage: /revoke @username | id, or reply to their message.",
         "ui.revoke_ok": "✅ Access for {who} revoked.",
         "ui.revoke_none": "{who} has no runtime role.",
+        # --- UI: shared-chat mode -----------------------------------------
+        "ui.chat_mode_current": (
+            "Chat mode: <b>{mode}</b>. <code>/chat direct</code> — I answer every message; "
+            "<code>/chat mention</code> — I answer only when you @mention me, reply to me, "
+            "or tag my engine (@claude / @codex)."
+        ),
+        "ui.chat_mode_usage": "Usage: <code>/chat direct</code> or <code>/chat mention</code>.",
+        "ui.chat_mode_set": "✅ Chat mode: <b>{mode}</b>.",
+        "ui.chat_mode_write_failed": "❌ Couldn't save the chat mode. Try again.",
+        "ui.chat_other_engine": (
+            "This topic runs {engine} right now. "
+            "Use /engine to switch before tagging the other one."
+        ),
         "ui.thinking": "⏳ Thinking...",
         "ui.recognizing_voice": "⏳ Transcribing voice...",
         "ui.processing_forwards": "⏳ Processing forwarded messages...",
@@ -369,6 +382,21 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ui.revoke_usage": "Использование: /revoke @username | id или ответ на сообщение.",
         "ui.revoke_ok": "✅ Доступ для {who} отозван.",
         "ui.revoke_none": "У {who} нет роли в рантайме.",
+        # --- UI: режим общего чата ----------------------------------------
+        "ui.chat_mode_current": (
+            "Режим чата: <b>{mode}</b>. <code>/chat direct</code> — отвечаю на каждое сообщение; "
+            "<code>/chat mention</code> — отвечаю, только если меня упомянули, ответили мне "
+            "или отметили мой движок (@claude / @codex)."
+        ),
+        "ui.chat_mode_usage": (
+            "Использование: <code>/chat direct</code> или <code>/chat mention</code>."
+        ),
+        "ui.chat_mode_set": "✅ Режим чата: <b>{mode}</b>.",
+        "ui.chat_mode_write_failed": "❌ Не удалось сохранить режим чата. Попробуй ещё раз.",
+        "ui.chat_other_engine": (
+            "Сейчас в этой теме работает {engine}. "
+            "Переключи движок через /engine, прежде чем звать другой."
+        ),
         "ui.thinking": "⏳ Думаю...",
         "ui.recognizing_voice": "⏳ Распознаю голосовое...",
         "ui.processing_forwards": "⏳ Обрабатываю пересланные сообщения...",

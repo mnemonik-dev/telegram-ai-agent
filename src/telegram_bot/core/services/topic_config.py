@@ -38,6 +38,16 @@ ExecMode = Literal["subprocess", "tmux"]
 _VALID_EXEC_MODES: set[str] = {"subprocess", "tmux"}
 _DEFAULT_EXEC_MODE: ExecMode = "subprocess"
 
+# chat_mode controls when the engine answers in a shared (supergroup) chat:
+#   direct  — every message from an allowed user goes to the engine (default,
+#             the original behaviour).
+#   mention — the engine answers only when addressed (@bot, @claude/@codex for
+#             the topic's engine, or a reply to the bot); other messages are
+#             kept as context and delivered with the next addressed one.
+ChatMode = Literal["direct", "mention"]
+_VALID_CHAT_MODES: set[str] = {"direct", "mention"}
+_DEFAULT_CHAT_MODE: ChatMode = "direct"
+
 Engine = Literal["claude", "codex"]
 _VALID_ENGINES: set[str] = {"claude", "codex"}
 _DEFAULT_ENGINE: Engine = "claude"
@@ -101,6 +111,7 @@ class TopicSettings:
     engine: Engine = _DEFAULT_ENGINE
     model: str | None = None
     dynamic_cwd: bool = False  # True when cwd was DYNAMIC_CWD_SENTINEL; resolved at spawn time
+    chat_mode: ChatMode = _DEFAULT_CHAT_MODE
 
 
 def _default_topic() -> TopicSettings:
@@ -301,6 +312,18 @@ class TopicConfig:
                 if isinstance(raw_model, str) and raw_model.strip() and model is None:
                     logger.warning("Invalid model %r for topic %d, dropping", raw_model, thread_id)
 
+                raw_chat_mode = value.get("chat_mode", _DEFAULT_CHAT_MODE)
+                if not isinstance(raw_chat_mode, str) or raw_chat_mode not in _VALID_CHAT_MODES:
+                    logger.warning(
+                        "Invalid chat_mode %r for topic %d, falling back to %r",
+                        raw_chat_mode,
+                        thread_id,
+                        _DEFAULT_CHAT_MODE,
+                    )
+                    chat_mode: ChatMode = _DEFAULT_CHAT_MODE
+                else:
+                    chat_mode = raw_chat_mode  # type: ignore[assignment]
+
                 topics[thread_id] = TopicSettings(
                     name=name,
                     type=topic_type,
@@ -312,6 +335,7 @@ class TopicConfig:
                     engine=engine,
                     model=model,
                     dynamic_cwd=dynamic_cwd,
+                    chat_mode=chat_mode,
                 )
 
         # Parse routing
@@ -467,6 +491,18 @@ class TopicConfig:
             field_name="exec_mode",
             value=mode,
             log_label="update_exec_mode",
+        )
+
+    async def update_chat_mode(self, thread_id: int, mode: str) -> bool:
+        """Persist a new chat_mode for one topic. Returns False on bad input."""
+        if mode not in _VALID_CHAT_MODES:
+            logger.warning("update_chat_mode: invalid mode %r", mode)
+            return False
+        return await self._update_topic_field(
+            thread_id=thread_id,
+            field_name="chat_mode",
+            value=mode,
+            log_label="update_chat_mode",
         )
 
     async def update_engine(self, thread_id: int, engine: Engine) -> bool:
