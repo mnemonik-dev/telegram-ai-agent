@@ -7,6 +7,7 @@ BOT_TOKEN must be set in environment (read from .env by start.sh).
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -259,11 +260,49 @@ def send_image(
     return result
 
 
+def _topic_config_path() -> Path:
+    raw = os.environ.get("TOPIC_CONFIG_PATH", "./topic_config.json")
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+    root = Path(os.environ.get("PROJECT_ROOT") or Path(__file__).resolve().parents[2])
+    return (root / path).resolve()
+
+
+def _norm_topic_name(name: str) -> str:
+    return " ".join(name.split()).casefold()
+
+
+def _find_existing_topic(name: str) -> int | None:
+    """Return the thread_id of a topic already registered under ``name``.
+
+    createForumTopic is not idempotent: every call makes a new thread, even
+    for an identical name. topic_config.json (kept in sync by the bot's
+    forum_topic handler) is the only name -> thread_id record we have, because
+    the Bot API cannot list topics.
+    """
+    try:
+        data = json.loads(_topic_config_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    topics = data.get("topics") if isinstance(data, dict) else None
+    if not isinstance(topics, dict):
+        return None
+    wanted = _norm_topic_name(name)
+    for key, entry in topics.items():
+        if not key.isdigit() or int(key) == 0 or not isinstance(entry, dict):
+            continue
+        if _norm_topic_name(str(entry.get("name", ""))) == wanted:
+            return int(key)
+    return None
+
+
 @mcp.tool()
 def create_topic(
     name: str,
     chat_id: int | None = None,
     icon_color: int | None = None,
+    force: bool = False,
 ) -> str:
     """Create a new forum topic in the Telegram chat. Returns the message_thread_id.
 
@@ -275,7 +314,12 @@ def create_topic(
     icon_color is one of the 7 Telegram-supported integers (e.g. 16711680 red,
     255 blue, 65280 green). When omitted Telegram picks one.
 
-    Returns a JSON-shaped string: '{"thread_id": N, "name": "..."}'
+    Idempotent by name: if a topic with the same name (case- and
+    whitespace-insensitive) is already registered in topic_config.json, its
+    thread_id is returned with "existing": true and nothing is created. Pass
+    force=true to create a second topic with the same name on purpose.
+
+    Returns a JSON string: '{"thread_id": N, "name": "...", "existing": bool}'
     or 'Ошибка: ...' on failure.
     """
     token = os.environ.get("BOT_TOKEN", "")
@@ -291,6 +335,11 @@ def create_topic(
     if len(name) > 128:
         # Telegram limit is 128 chars; trim silently rather than fail.
         name = name[:128]
+
+    if not force:
+        existing = _find_existing_topic(name)
+        if existing is not None:
+            return json.dumps({"thread_id": existing, "name": name, "existing": True})
 
     url = f"{_TELEGRAM_API}/bot{token}/createForumTopic"
     payload: dict[str, object] = {"chat_id": resolved_chat, "name": name}
@@ -308,7 +357,7 @@ def create_topic(
     thread_id = data.get("result", {}).get("message_thread_id")
     if thread_id is None:
         return f"Ошибка: Telegram не вернул message_thread_id: {data!r}"
-    return f'{{"thread_id": {thread_id}, "name": {name!r}}}'
+    return json.dumps({"thread_id": thread_id, "name": name, "existing": False})
 
 
 if __name__ == "__main__":
