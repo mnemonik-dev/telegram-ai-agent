@@ -23,6 +23,10 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str
     allowed_user_ids: list[int] = []
+    # Runtime-editable roles/invites (see core/services/user_store.py).
+    # allowed_user_ids stay the bootstrap operators; everyone else lives here.
+    users_file: str = "./users.json"
+    invite_ttl_hours: int = 48
     bot_lang: str = "en"
     # Directory where handlers download media before forwarding to CC.
     # Core-owned generic bot feature. Override via `FILE_CACHE_DIR` in .env.
