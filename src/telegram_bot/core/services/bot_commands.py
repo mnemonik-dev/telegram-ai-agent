@@ -60,6 +60,11 @@ PUBLIC_BOT_COMMANDS: tuple[LocalizedBotCommand, ...] = (
         "Пересканировать команды движка",
         "Rescan engine commands",
     ),
+    LocalizedBotCommand(
+        "chat",
+        "Режим общего чата: direct/mention",
+        "Shared-chat mode: direct/mention",
+    ),
     LocalizedBotCommand("whoami", "Мой id и роль", "My id and role"),
     LocalizedBotCommand("invite", "Пригласить пользователя (оператор)", "Invite a user (operator)"),
     LocalizedBotCommand("grant", "Выдать роль (оператор)", "Grant a role (operator)"),

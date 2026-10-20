@@ -14,6 +14,7 @@ from aiogram.types import Message
 
 from telegram_bot.core.config import get_settings
 from telegram_bot.core.handlers.cancel import router as cancel_router
+from telegram_bot.core.handlers.chat_mode import router as chat_mode_router
 from telegram_bot.core.handlers.commands import router as commands_router
 from telegram_bot.core.handlers.forum_topic import router as forum_topic_router
 from telegram_bot.core.handlers.forward import ForwardBatcher
@@ -29,11 +30,13 @@ from telegram_bot.core.handlers.voice import router as voice_router
 from telegram_bot.core.keyboards import topic_keyboard
 from telegram_bot.core.messages import t
 from telegram_bot.core.middleware.auth import AuthMiddleware
+from telegram_bot.core.middleware.chat_mode import ChatModeMiddleware
 from telegram_bot.core.services.bot_commands import (
     MOLYANOV_BOT_COMMANDS,
     PUBLIC_BOT_COMMANDS,
     setup_bot_commands,
 )
+from telegram_bot.core.services.chat_context import ChatBacklog
 from telegram_bot.core.services.claude import SessionManager
 from telegram_bot.core.services.command_registry import CommandRegistry
 from telegram_bot.core.services.dynamic_cwd import (
@@ -294,8 +297,10 @@ async def _start() -> None:
         invite_ttl_hours=settings.invite_ttl_hours,
     )
     auth = AuthMiddleware(user_store)
+    chat_backlog = ChatBacklog()
     dp.message.outer_middleware(auth)
     dp.callback_query.outer_middleware(auth)
+    dp.message.middleware(ChatModeMiddleware(topic_config, chat_backlog))
     dp.message.filter(F.chat.type.in_({ChatType.PRIVATE, ChatType.SUPERGROUP}))
 
     # Order: commands -> cancel -> mode -> forward -> voice -> photo -> text
@@ -304,6 +309,7 @@ async def _start() -> None:
     # any text/forward handler tries to read mode/cwd for the new thread.
     dp.include_router(forum_topic_router)
     dp.include_router(users_router)
+    dp.include_router(chat_mode_router)
     dp.include_router(commands_router)
     dp.include_router(gateway_router)
     dp.include_router(cancel_router)
